@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+  
+  --color-canva-teal: #00c4cc;
+  --color-canva-purple: #8b3dff;
+  --color-canva-bg: #f9f9fb;
+  --color-canva-ink: #0e1318;
+  --color-canva-border: #e1e4e8;
+  --color-canva-gray: #6d7175;
+}
+
+@layer base {
+  body {
+    @apply bg-canva-bg text-canva-ink antialiased;
+  }
+
+  .markdown-container a {
+    @apply text-canva-teal underline hover:opacity-80 transition-opacity;
+  }
+
+  .markdown-container {
+    @apply break-words;
+  }
+
+  .markdown-container table {
+    @apply w-full border-collapse my-4 text-xs block overflow-x-auto;
+  }
+
+  .markdown-container th {
+    @apply bg-gray-800 text-gray-200 border border-gray-700 p-2 text-left;
+  }
+
+  .markdown-container td {
+    @apply border border-gray-700 p-2 text-gray-300;
+  }
+
+  .markdown-container p {
+    @apply mb-4 break-words;
+  }
+
+  .markdown-container h2 {
+    @apply text-2xl font-bold mt-6 mb-4 text-canva-ink;
+  }
+
+  .markdown-container h3 {
+    @apply text-xl font-bold mt-5 mb-3 text-canva-ink;
+  }
+
+  .markdown-container h4 {
+    @apply text-lg font-bold mt-4 mb-2 text-canva-ink;
+  }
+
+  .markdown-container ul {
+    @apply list-disc list-inside mb-4;
+  }
+
+  .markdown-container li {
+    @apply mb-1;
+  }
+
+  .markdown-container img {
+    @apply max-w-full h-auto rounded-lg my-4;
+  }
+
+  .markdown-container blockquote {
+    @apply border-l-4 border-canva-teal pl-4 italic my-4 text-gray-600;
+  }
+
+  /* Dark mode variants for AI response area */
+  .bg-\[\#0e1318\] .markdown-container h2,
+  .bg-\[\#0e1318\] .markdown-container h3,
+  .bg-\[\#0e1318\] .markdown-container h4 {
+    @apply text-gray-100;
+  }
+}
