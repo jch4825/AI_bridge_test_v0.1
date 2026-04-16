@@ -30,15 +30,19 @@
   }
 
   .markdown-container th {
-    @apply bg-gray-800 text-gray-200 border border-gray-700 p-2 text-left;
+    @apply bg-gray-200 text-black border border-gray-300 p-2 text-left font-bold;
   }
 
   .markdown-container td {
-    @apply border border-gray-700 p-2 text-gray-300;
+    @apply border border-gray-300 p-2 text-black;
   }
 
   .markdown-container p {
     @apply mb-4 break-words;
+  }
+
+  .markdown-container img {
+    @apply max-w-full h-auto rounded-lg border border-gray-200 shadow-sm my-4;
   }
 
   .markdown-container h2 {
@@ -66,13 +70,13 @@
   }
 
   .markdown-container blockquote {
-    @apply border-l-4 border-canva-teal pl-4 italic my-4 text-gray-600;
+    @apply border-l-4 border-canva-teal pl-4 italic my-4 text-canva-ink;
   }
 
   /* Dark mode variants for AI response area */
-  .bg-\[\#0e1318\] .markdown-container h2,
-  .bg-\[\#0e1318\] .markdown-container h3,
-  .bg-\[\#0e1318\] .markdown-container h4 {
+  .dark-markdown h2,
+  .dark-markdown h3,
+  .dark-markdown h4 {
     @apply text-gray-100;
   }
 }

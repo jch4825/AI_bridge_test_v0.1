@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, PlayCircle, Clock, ArrowRight } from 'lucide-react';
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, PlayCircle, Clock, ArrowRight, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -12,6 +12,7 @@ interface LessonViewerProps {
   onBack: () => void;
   onComplete: (lessonId: string) => void;
   isCompleted: boolean;
+  onNavigateToLesson: (lessonId: string) => void;
 }
 
 const LEARNING_POINTS: Record<string, string[]> = {
@@ -19,7 +20,7 @@ const LEARNING_POINTS: Record<string, string[]> = {
     "**보안의 핵심:** API 키는 여러분의 인공지능 계정에 접속하는 '비밀번호'와 같습니다. 절대로 타인에게 공유하지 마세요.",
     "**비용 관리:** API 사용량에 따라 비용이 발생할 수 있으므로(무료 티어 제외), 사용량을 주기적으로 확인하는 습관이 필요합니다.",
     "**연결의 힘:** API를 활용하면 챗봇뿐만 아니라 엑셀, 구글 문서 등 다양한 도구에서 AI의 힘을 빌릴 수 있습니다.",
-    "**환경 설정:** API 키를 환경 변수(.env) 등에 안전하게 저장하는 것이 개발의 기본 소양입니다.",
+    "**API는 무엇:** API 키는 전자 출입증과 같습니다. API키를 통해 여러분이 누구인지 서버가 인식합니다.",
     "**무료 티어 활용:** Google AI Studio는 교육용으로 충분한 무료 한도를 제공하므로, 부담 없이 실습해볼 수 있습니다."
   ],
   'l1-5': [
@@ -33,12 +34,12 @@ const LEARNING_POINTS: Record<string, string[]> = {
     "**도구로서의 AI:** AI는 도구일 뿐입니다. 최종적인 판단과 책임은 항상 사용자(교사)에게 있음을 잊지 마세요.",
     "**구체적인 지시:** 프롬프트를 구체적으로 작성할수록 AI는 더 정확하고 유용한 답변을 제공합니다.",
     "**교차 검증 필수:** AI의 답변에는 '할루시네이션(환각)'이 있을 수 있으니, 중요한 정보는 반드시 교차 검증하세요.",
-    "**모델별 특성:** 다양한 AI 모델을 사용해보며 각 모델의 특징과 장단점을 파악하는 것이 중요합니다.",
+    "**개인정보 보호:** 인공지능에게 무심코 학생의 개인정보나 기밀을 넘기고 있지는 않나요?",
     "**지속적인 학습:** AI 기술은 빠르게 발전합니다. 새로운 기능과 업데이트 소식에 관심을 가져보세요."
   ]
 };
 
-function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerProps) {
+function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLesson }: LessonViewerProps) {
   const [userInput, setUserInput] = useState(lesson.interactive?.initialInput || '');
   const [aiResponse, setAiResponse] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -65,22 +66,30 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerP
       }
     }
 
-    // Special handling for lesson 1-5: Call Gemini API
-    if (lesson.id === 'l1-5') {
+    // Special handling for lessons that call Gemini API
+    if (lesson.id === 'l1-5' || lesson.interactive.systemPrompt) {
       const savedKey = localStorage.getItem('gemini-api-key');
       let fullText = "";
 
       if (!savedKey || savedKey.length < 10) {
-        fullText = "API키가 제대로 작동하지 않아, default 답변을 생성합니다. 반갑습니다. 여러분이 이 튜토리얼을 통해 인공지능을 더욱 잘 이해하실 수 있으면 좋겠습니다.";
+        fullText = "(API키가 제대로 작동하지 않아, default 답변을 생성합니다.)안녕하세요. AI Bridge에서 인공지능에 대한 기초를 배워보아요.";
       } else {
         try {
           const genAI = new GoogleGenerativeAI(savedKey);
-          const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-          const result = await model.generateContent(inputToUse);
+          const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+          let promptWithConstraint = inputToUse;
+          
+          if (lesson.interactive.systemPrompt) {
+            promptWithConstraint = `${lesson.interactive.systemPrompt}${inputToUse}`;
+          } else if (lesson.id === 'l1-5') {
+            promptWithConstraint = `${inputToUse}\n\n(지시사항: 답변은 반드시 5줄 이내로 간결하게 작성해주세요.)`;
+          }
+          
+          const result = await model.generateContent(promptWithConstraint);
           fullText = result.response.text();
         } catch (error) {
           console.error("Gemini API Error:", error);
-          fullText = "API키가 제대로 작동하지 않아, default 답변을 생성합니다. 반갑습니다. 여러분이 이 튜토리얼을 통해 인공지능을 더욱 잘 이해하실 수 있으면 좋겠습니다.";
+          fullText = "API 호출 중 오류가 발생했습니다. API 키가 올바른지 확인해주세요.";
         }
       }
 
@@ -99,7 +108,7 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerP
           clearInterval(interval);
           setIsTyping(false);
         }
-      }, 20);
+      }, 10);
       return;
     }
     
@@ -116,7 +125,7 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerP
       } else if (lesson.interactive.answers["default"]) {
         fullText = lesson.interactive.answers["default"];
       } else {
-        fullText = "죄송합니다. 목록에 있는 모델 중 하나를 선택하거나 정확히 입력해주세요.";
+        fullText = "정확한 값을 입력하거나 버튼을 클릭해주세요.";
       }
     }
 
@@ -135,7 +144,7 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerP
         clearInterval(interval);
         setIsTyping(false);
       }
-    }, 30);
+    }, 15);
   };
 
   return (
@@ -164,7 +173,7 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerP
                   ),
                 }}
               >
-                {lesson.content.replace(/\. /g, '.\n\n')}
+                {lesson.content.replace(/^[ \t]+/gm, '')}
               </ReactMarkdown>
             </div>
           </div>
@@ -199,26 +208,63 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerP
                           </button>
                         ))}
                       </div>
+                    ) : lesson.interactive.predefinedInputs ? (
+                      <div className="flex flex-col gap-3">
+                        {lesson.interactive.predefinedInputs.map((input, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setUserInput(input);
+                              handleRun(input);
+                            }}
+                            className="text-left px-4 py-3 bg-[#1c232b] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all text-xs leading-relaxed"
+                          >
+                            {input}
+                          </button>
+                        ))}
+                      </div>
                     ) : (
                       lesson.interactive.initialInput
                     )}
                   </div>
                 </div>
-                <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 relative group">
-                  <textarea
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    className="w-full h-full bg-transparent text-white font-mono text-sm outline-none resize-none"
-                    placeholder={lesson.id === 'l1-5' ? "아무런 질문이나 작성해 보세요..." : "여기에 질문을 입력하거나 위 문장을 따라 써보세요..."}
-                  />
-                  <button 
-                    onClick={() => handleRun()}
-                    disabled={isTyping}
-                    className="absolute bottom-5 right-5 px-8 py-3 bg-canva-teal text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-teal-900/20"
-                  >
-                    실행 (Run)
-                  </button>
-                </div>
+                {lesson.id !== 'l2-1' && lesson.id !== 'l2-2' && lesson.id !== 'l2-3' && lesson.id !== 'l2-4' && lesson.id !== 'l2-5' && (
+                  <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 relative group">
+                    <textarea
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      className="w-full h-full bg-transparent text-white font-mono text-sm outline-none resize-none"
+                      placeholder={lesson.id === 'l1-5' ? "아무런 질문이나 작성해 보세요..." : "여기에 질문을 입력하거나 위 문장을 따라 써보세요..."}
+                    />
+                    <div className="absolute bottom-5 right-5 flex gap-3">
+                      {(lesson.id === 'l2-6' || lesson.id === 'l2-7') && (
+                        <button
+                          onClick={() => onNavigateToLesson('l1-4')}
+                          className="px-6 py-3 bg-canva-purple text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg"
+                        >
+                          API 키 입력
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => {
+                          setUserInput('');
+                          setAiResponse('');
+                        }}
+                        disabled={isTyping}
+                        className="px-6 py-3 bg-gray-700 text-white rounded-xl font-bold text-sm hover:bg-gray-600 transition-all disabled:opacity-50 shadow-lg"
+                      >
+                        초기화
+                      </button>
+                      <button 
+                        onClick={() => handleRun()}
+                        disabled={isTyping}
+                        className="px-8 py-3 bg-canva-teal text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-teal-900/20"
+                      >
+                        실행 (Run)
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center text-gray-500 italic">
@@ -234,12 +280,25 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerP
             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">답변 안내</span>
           </div>
           <div className="flex-1 p-8 overflow-y-auto">
-            <div className="bg-[#1c232b] rounded-xl p-8 border border-gray-800 min-h-[160px]">
-              <div className="flex items-center gap-2 mb-5">
-                <div className="w-2 h-2 bg-canva-teal rounded-full animate-pulse"></div>
-                <span className="text-[10px] font-bold text-canva-teal uppercase tracking-widest">AI Response</span>
+            <div className="bg-[#1c232b] rounded-xl p-8 border border-gray-800 min-h-[160px] relative">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-canva-teal rounded-full animate-pulse"></div>
+                  <span className="text-[10px] font-bold text-canva-teal uppercase tracking-widest">AI Response</span>
+                </div>
+                {(lesson.id === 'l2-6' || lesson.id === 'l2-7') && aiResponse && !isTyping && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(aiResponse);
+                      alert('복사되었습니다.');
+                    }}
+                    className="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1 bg-gray-800 px-3 py-1.5 rounded-lg"
+                  >
+                    <Copy size={14} /> AI response 내용 복사 하기
+                  </button>
+                )}
               </div>
-              <div className="text-gray-300 font-mono text-sm leading-relaxed markdown-container">
+              <div className="text-gray-300 font-mono text-sm leading-relaxed markdown-container dark-markdown">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -262,7 +321,7 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted }: LessonViewerP
                 className="mt-8 p-6 bg-canva-purple/10 border border-canva-purple/20 rounded-xl"
               >
                 <h5 className="text-canva-purple font-bold text-xs mb-3 uppercase tracking-wider">학습 포인트</h5>
-                <div className="text-sm text-gray-400 leading-relaxed markdown-container">
+                <div className="text-sm text-white leading-relaxed markdown-container">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -334,7 +393,7 @@ export default function Tutorial() {
     <div className="max-w-4xl mx-auto p-10">
       <header className="mb-12">
         <h1 className="text-3xl font-bold text-canva-ink mb-4">학습 튜토리얼</h1>
-        <p className="text-canva-gray">LLM 이해부터 윤리 점검까지, 초등교사를 위한 5단계 로드맵입니다.</p>
+        <p className="text-canva-ink">LLM 이해부터 윤리 점검까지, 초등교사를 위한 5단계 로드맵입니다.</p>
       </header>
 
       <div className="space-y-6">
@@ -449,6 +508,12 @@ export default function Tutorial() {
               onBack={() => setCurrentLesson(null)} 
               onComplete={toggleComplete}
               isCompleted={completedLessons.includes(currentLesson.id)}
+              onNavigateToLesson={(id) => {
+                const lesson = lessons.find(l => l.id === id);
+                if (lesson) {
+                  setCurrentLesson(lesson);
+                }
+              }}
             />
           </motion.div>
         ) : selectedModule ? (

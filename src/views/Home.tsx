@@ -50,7 +50,7 @@ export default function Home({ onViewChange }: HomeProps) {
           
           <div className="max-w-2xl mx-auto mb-12 relative">
             <div className="bg-white rounded-lg h-14 flex items-center px-6 shadow-xl">
-              <span className="text-canva-gray text-sm font-medium">콘텐츠 또는 템플릿 검색</span>
+              <span className="text-canva-ink text-sm font-medium">콘텐츠 또는 템플릿 검색</span>
             </div>
           </div>
 
@@ -98,7 +98,7 @@ export default function Home({ onViewChange }: HomeProps) {
                 </div>
                 <div className="p-6">
                   <h3 className="text-base font-bold mb-2 text-canva-ink">{part.title}</h3>
-                  <p className="text-sm text-canva-gray leading-relaxed">{part.description}</p>
+                  <p className="text-sm text-canva-ink leading-relaxed">{part.description}</p>
                 </div>
               </motion.div>
             );
