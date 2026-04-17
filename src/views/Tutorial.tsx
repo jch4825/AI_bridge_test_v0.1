@@ -1,11 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, PlayCircle, Clock, ArrowRight, Copy } from 'lucide-react';
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, PlayCircle, Clock, ArrowRight, Copy, Info, FileText, Lock, Check, School } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from "@google/genai";
 import { modules, lessons, Lesson } from '../data/tutorialData';
 import { Module } from '../types';
+import {
+  Lesson41Interactive,
+  Lesson42Interactive,
+  Lesson43Interactive,
+  Lesson44Interactive,
+  Lesson45Interactive,
+  Lesson46Interactive
+} from './Module4Components';
+
+let module4PrinciplesShown = false;
 
 interface LessonViewerProps {
   lesson: Lesson;
@@ -41,15 +51,43 @@ const LEARNING_POINTS: Record<string, string[]> = {
 
 function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLesson }: LessonViewerProps) {
   const [userInput, setUserInput] = useState(lesson.interactive?.initialInput || '');
-  const [aiResponse, setAiResponse] = useState('');
+  const [aiResponse, setAiResponse] = useState<any>('');
   const [isTyping, setIsTyping] = useState(false);
   const [learningPoint, setLearningPoint] = useState('');
+  const [showOverlay, setShowOverlay] = useState(false);
+
+  // M4 Popup State
+  const [m4PopupData, setM4PopupData] = useState<{title: string, content: React.ReactNode, point: string, hideDocsButton?: boolean} | null>(null);
+
+  const handleM4Execute = (data: {title: string, content: React.ReactNode, point: string, hideDocsButton?: boolean}) => {
+    setM4PopupData(data);
+  };
+
+  const closeM4Popup = () => {
+    setM4PopupData(null);
+  };
+
+  useEffect(() => {
+    if (lesson.moduleId === 'm4' && !module4PrinciplesShown) {
+      setShowOverlay(true);
+    }
+  }, [lesson.moduleId]);
+
+  const handleCloseOverlay = () => {
+    module4PrinciplesShown = true;
+    setShowOverlay(false);
+  };
 
   useEffect(() => {
     const points = LEARNING_POINTS[lesson.id] || LEARNING_POINTS['default'];
     const randomPoint = points[Math.floor(Math.random() * points.length)];
     setLearningPoint(randomPoint);
-  }, [lesson.id]);
+    
+    // Reset state when navigating to a different lesson
+    setUserInput(lesson.interactive?.initialInput || '');
+    setAiResponse('');
+    setIsTyping(false);
+  }, [lesson.id, lesson.interactive?.initialInput]);
 
   const handleRun = async (forcedInput?: string) => {
     if (!lesson.interactive) return;
@@ -57,6 +95,26 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
     
     setIsTyping(true);
     setAiResponse('');
+
+    if (inputToUse.trim() === '') {
+      const emptyMsg = '입력창에 내용을 작성해 주세요.';
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i < emptyMsg.length) {
+          const char = emptyMsg.charAt(i);
+          if (char !== '') {
+            setAiResponse(prev => prev + char);
+          }
+          i++;
+        }
+        
+        if (i >= emptyMsg.length) {
+          clearInterval(interval);
+          setIsTyping(false);
+        }
+      }, 15);
+      return;
+    }
 
     // Special handling for lesson 1-4: Save API Key
     if (lesson.id === 'l1-4') {
@@ -72,24 +130,29 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
       let fullText = "";
 
       if (!savedKey || savedKey.length < 10) {
-        fullText = "(API키가 제대로 작동하지 않아, default 답변을 생성합니다.)안녕하세요. AI Bridge에서 인공지능에 대한 기초를 배워보아요.";
+        fullText = "(API키가 제대로 작동하지 않아, default 답변을 생성합니다.) API키를 입력한 후 실습을 진행해 보세요.";
       } else {
         try {
-          const genAI = new GoogleGenerativeAI(savedKey);
-          const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+          const ai = new GoogleGenAI({ apiKey: savedKey });
           let promptWithConstraint = inputToUse;
+          let systemInstruction = "";
           
           if (lesson.interactive.systemPrompt) {
-            promptWithConstraint = `${lesson.interactive.systemPrompt}${inputToUse}`;
+            systemInstruction = lesson.interactive.systemPrompt;
           } else if (lesson.id === 'l1-5') {
-            promptWithConstraint = `${inputToUse}\n\n(지시사항: 답변은 반드시 5줄 이내로 간결하게 작성해주세요.)`;
+            systemInstruction = "답변은 반드시 5줄 이내로 간결하게 작성해주세요.";
           }
           
-          const result = await model.generateContent(promptWithConstraint);
-          fullText = result.response.text();
-        } catch (error) {
+          const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: promptWithConstraint,
+            config: systemInstruction ? { systemInstruction } : undefined
+          });
+          
+          fullText = response.text || "답변을 생성할 수 없습니다.";
+        } catch (error: any) {
           console.error("Gemini API Error:", error);
-          fullText = "API 호출 중 오류가 발생했습니다. API 키가 올바른지 확인해주세요.";
+          fullText = `API 호출 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`;
         }
       }
 
@@ -149,20 +212,89 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0e1318]">
+      {showOverlay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 overflow-y-auto" style={{ minHeight: '100vh' }}>
+          <div className="bg-white rounded-xl max-w-[480px] w-full p-8 shadow-2xl relative">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">모듈 4를 시작하기 전에</h3>
+            
+            <div className="space-y-4">
+              <div className="flex gap-4 items-start p-4 border-b border-gray-100">
+                <div className="text-2xl mt-1">🔒</div>
+                <div>
+                  <h4 className="font-bold text-gray-800 text-sm mb-1">개인정보는 AI에 넣지 않습니다</h4>
+                  <p className="text-xs text-gray-600 leading-relaxed">학생 이름·주민번호·연락처, 교사 인사 정보는 절대 AI에 입력하지 않고, 가명 혹은 익명화하여 사용합니다.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-start p-4 border-b border-gray-100">
+                <div className="text-2xl mt-1">✅</div>
+                <div>
+                  <h4 className="font-bold text-gray-800 text-sm mb-1">AI 결과물은 반드시 교사가 검토합니다</h4>
+                  <p className="text-xs text-gray-600 leading-relaxed">공문, 가정통신문 등은 법적 효력이 발생할 수 있습니다. AI는 어디까지나 초안을 제시할 뿐 최종 책임은 작성자 본인에게 있습니다.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-start p-4 border-b border-gray-100">
+                <div className="text-2xl mt-1"><School size={24} className="text-canva-purple" /></div>
+                <div>
+                  <h4 className="font-bold text-gray-800 text-sm mb-1">학교 공식 시스템 연동은 승인이 필요합니다</h4>
+                  <p className="text-xs text-gray-600 leading-relaxed">나이스(NEIS)나 업무관리시스템 등 학교 자체 공식망에 AI를 직접 연결하는 행위는 교육청 승인 없이 개인이 임의로 해선 안 됩니다.</p>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleCloseOverlay}
+              className="w-full mt-8 py-3 bg-canva-purple text-white font-bold rounded-lg hover:bg-opacity-90 transition-all text-sm"
+            >
+              확인했습니다
+            </button>
+          </div>
+        </div>
+      )}
       {/* Left Side (1 & 4): Explanation */}
       <div className="w-1/2 border-r border-gray-800 flex flex-col bg-white min-w-0">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-          <button 
-            onClick={onBack}
-            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <span className="text-xs font-bold text-canva-purple uppercase tracking-widest">설명</span>
-          <div className="w-10"></div>
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pr-4">
+            <button 
+              onClick={onBack}
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors flex-shrink-0"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex gap-1.5 py-1">
+              {(() => {
+                let moduleLessons = lessons
+                  .filter(l => l.moduleId === lesson.moduleId)
+                  .sort((a, b) => a.order - b.order);
+                  
+                if (lesson.moduleId === 'm2' || lesson.moduleId === 'm3') {
+                  const apiLesson = lessons.find(l => l.id === 'l1-4');
+                  if (apiLesson) {
+                    moduleLessons = [apiLesson, ...moduleLessons];
+                  }
+                }
+                
+                return moduleLessons.map(ml => (
+                  <button
+                    key={ml.id}
+                    onClick={() => onNavigateToLesson(ml.id)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all border ${
+                      ml.id === lesson.id 
+                        ? 'bg-canva-purple border-canva-purple text-white shadow-sm' 
+                        : 'bg-white border-gray-200 text-gray-400 hover:border-canva-purple/30 hover:text-canva-purple'
+                    }`}
+                  >
+                    {ml.id === 'l1-4' ? 'API입력(1.4)' : ml.id.replace('l', '').replace('-', '.')}
+                  </button>
+                ));
+              })()}
+            </div>
+          </div>
+          <span className="text-[10px] font-bold text-canva-purple uppercase tracking-widest flex-shrink-0 ml-2">Explanation</span>
         </div>
-        <div className="flex-1 overflow-y-auto p-10 min-w-0 bg-white">
-          <div className="w-full" style={{ maxWidth: '40em' }}>
+        <div className="flex-1 overflow-y-auto p-10 min-w-0 bg-white relative">
+          <div className="w-full pb-20" style={{ maxWidth: '40em' }}>
             <h2 className="text-3xl font-bold text-canva-ink mb-8 break-words">{lesson.title}</h2>
             <div className="markdown-container text-canva-ink leading-relaxed text-base">
               <ReactMarkdown 
@@ -176,193 +308,329 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
                 {lesson.content.replace(/^[ \t]+/gm, '')}
               </ReactMarkdown>
             </div>
+            {lesson.tip && (
+              <div className="mt-10 p-5 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="bg-amber-100 p-1.5 rounded-md">
+                    <Info size={16} className="text-amber-600" />
+                  </div>
+                  <span className="text-sm font-bold text-amber-700">현명하게 활용하기</span>
+                </div>
+                <p className="text-[13px] text-gray-800 leading-relaxed font-medium">
+                  {lesson.tip}
+                </p>
+              </div>
+            )}
           </div>
+          
+          {/* Technique Connection Feature (Spec Requirement) */}
+          {lesson.technique && (
+            <div className="sticky bottom-0 left-0 right-0 p-6 bg-white border-t border-gray-100 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+              <div className="flex items-start gap-4">
+                <div className="bg-canva-purple/10 text-canva-purple p-2 rounded-lg flex-shrink-0">
+                  <Info size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-canva-ink mb-1">기법 연결: {lesson.technique.label}</h4>
+                  <p className="text-xs text-canva-gray leading-relaxed">{lesson.technique.description}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Right Side (2 & 3) */}
       <div className="w-1/2 flex flex-col">
-        {/* Top Right (2): Problem Input */}
-        <div className="h-1/2 border-b border-gray-800 flex flex-col bg-[#1c232b]">
-          <div className="p-4 border-b border-gray-800 flex items-center justify-center">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">문제 입력</span>
+        <div className="flex-1 flex flex-col min-h-0 relative">
+          {/* Main interactive area: full height for m4, otherwise top half */}
+          <div className={`flex flex-col bg-[#0e1318] border-gray-800 ${lesson.moduleId === 'm4' ? 'flex-1' : 'h-1/2 border-b'}`}>
+            <div className="p-4 border-b border-gray-800 flex items-center justify-center shrink-0">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">문제 입력</span>
+            </div>
+            <div className={`flex-1 p-8 flex flex-col overflow-y-auto no-scrollbar`}>
+              {lesson.interactive ? (
+                <>
+                  {lesson.moduleId !== 'm4' && (
+                    <div className="mb-6">
+                      <span className="text-canva-teal font-bold text-sm mb-3 block">{lesson.interactive.prompt}</span>
+                      <div className="bg-[#1c232b] rounded-xl p-5 border border-gray-800 text-gray-300 font-mono text-sm">
+                        {lesson.id === 'l1-3' ? (
+                          <div className="flex gap-4">
+                            {['ChatGPT', 'Gemini', 'Claude'].map(model => (
+                              <button
+                                key={model}
+                                onClick={() => {
+                                  setUserInput(model);
+                                  handleRun(model);
+                                }}
+                                className="px-4 py-2 bg-[#0e1318] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all"
+                              >
+                                {model}
+                              </button>
+                            ))}
+                          </div>
+                        ) : lesson.interactive.predefinedInputs ? (
+                          <div className="flex flex-col gap-3">
+                            {lesson.interactive.predefinedInputs.map((input, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setUserInput(input);
+                                  handleRun(input);
+                                }}
+                                className="text-left px-4 py-3 bg-[#0e1318] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all text-xs leading-relaxed"
+                              >
+                                {input}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          lesson.interactive.initialInput
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {lesson.moduleId === 'm4' ? (
+                    <>
+                      {lesson.id === 'l4-1' && <Lesson41Interactive onExecute={handleM4Execute} />}
+                      {lesson.id === 'l4-2' && <Lesson42Interactive onExecute={handleM4Execute} />}
+                      {lesson.id === 'l4-3' && <Lesson43Interactive onExecute={handleM4Execute} />}
+                      {lesson.id === 'l4-4' && <Lesson44Interactive onExecute={handleM4Execute} />}
+                      {lesson.id === 'l4-5' && <Lesson45Interactive onExecute={handleM4Execute} />}
+                      {lesson.id === 'l4-6' && <Lesson46Interactive onExecute={handleM4Execute} />}
+                    </>
+                  ) : lesson.id !== 'l2-1' && lesson.id !== 'l2-2' && lesson.id !== 'l2-3' && lesson.id !== 'l2-4' && lesson.id !== 'l2-5' && lesson.id !== 'l3-1' && (
+                    <div className="flex-1 bg-[#1c232b] rounded-xl p-5 border border-gray-800 relative group min-h-[200px]">
+                      <textarea
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
+                        className="w-full h-full bg-transparent text-white font-mono text-sm outline-none resize-none"
+                        placeholder={lesson.id === 'l1-5' ? "아무런 질문이나 작성해 보세요..." : "여기에 질문을 입력하거나 위 문장을 따라 써보세요..."}
+                      />
+                      <div className="absolute bottom-5 right-5 flex gap-3">
+                        {(lesson.id === 'l2-6' || lesson.id === 'l2-7' || lesson.moduleId === 'm3') && (
+                          <button
+                            onClick={() => onNavigateToLesson('l1-4')}
+                            className="px-6 py-3 bg-canva-purple text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg"
+                          >
+                            API 키 입력
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => {
+                            setUserInput('');
+                            setAiResponse('');
+                          }}
+                          disabled={isTyping}
+                          className="px-6 py-3 bg-gray-700 text-white rounded-xl font-bold text-sm hover:bg-gray-600 transition-all disabled:opacity-50 shadow-lg"
+                        >
+                          초기화
+                        </button>
+                        <button 
+                          onClick={() => handleRun()}
+                          disabled={isTyping}
+                          className="px-8 py-3 bg-canva-teal text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-teal-900/20"
+                        >
+                          실행 (Run)
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-gray-500 italic">
+                  이 레슨은 실습이 포함되어 있지 않습니다.
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex-1 p-8 flex flex-col overflow-hidden">
-            {lesson.interactive ? (
-              <>
-                <div className="mb-6">
-                  <span className="text-canva-teal font-bold text-sm mb-3 block">{lesson.interactive.prompt}</span>
-                  <div className="bg-[#0e1318] rounded-xl p-5 border border-gray-800 text-gray-300 font-mono text-sm">
-                    {lesson.id === 'l1-3' ? (
-                      <div className="flex gap-4">
-                        {['ChatGPT', 'Gemini', 'Claude'].map(model => (
-                          <button
-                            key={model}
-                            onClick={() => {
-                              setUserInput(model);
-                              handleRun(model);
-                            }}
-                            className="px-4 py-2 bg-[#1c232b] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all"
-                          >
-                            {model}
-                          </button>
-                        ))}
-                      </div>
-                    ) : lesson.interactive.predefinedInputs ? (
-                      <div className="flex flex-col gap-3">
-                        {lesson.interactive.predefinedInputs.map((input, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setUserInput(input);
-                              handleRun(input);
-                            }}
-                            className="text-left px-4 py-3 bg-[#1c232b] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all text-xs leading-relaxed"
-                          >
-                            {input}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      lesson.interactive.initialInput
+
+          {/* AI Response area (Hidden for M4 because it uses popup) */}
+          {lesson.moduleId !== 'm4' && (
+            <div className="h-1/2 flex flex-col bg-[#0e1318]">
+              <div className="p-4 border-b border-gray-800 flex items-center justify-center shrink-0">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">답변 안내</span>
+              </div>
+              <div className="flex-1 p-8 overflow-y-auto no-scrollbar">
+                <div className="bg-[#1c232b] rounded-xl p-8 border border-gray-800 min-h-[160px] relative">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-canva-teal rounded-full animate-pulse"></div>
+                      <span className="text-[10px] font-bold text-canva-teal uppercase tracking-widest">AI Response</span>
+                    </div>
+                    {(lesson.id === 'l2-6' || lesson.id === 'l2-7' || (lesson.moduleId === 'm3' && lesson.id !== 'l3-1')) && aiResponse && !isTyping && (
+                      <button
+                        onClick={async () => {
+                          if (!localStorage.getItem('gemini-api-key')) {
+                            alert('구글 Docs 문서로 내보낼 수 없습니다.\n\n이유: 사용자의 API 키가 저장되어 있지 않습니다. [1-4. API 키 발급 및 입력] 레슨에서 API 키를 먼저 등록해주세요.');
+                            return;
+                          }
+
+                          try {
+                            await navigator.clipboard.writeText(aiResponse);
+                            window.open('https://docs.new', '_blank');
+                          } catch (err) {
+                            alert('클립보드 자동 복사에 실패했습니다. 수동으로 텍스트를 복사해주세요.');
+                          }
+                        }}
+                        className="text-xs text-white hover:bg-blue-600 transition-colors flex items-center gap-1 bg-blue-500 px-3 py-1.5 rounded-lg font-medium shadow-sm"
+                      >
+                        <FileText size={14} /> 구글Docs에 ctrl+v 하세요.
+                      </button>
                     )}
                   </div>
-                </div>
-                {lesson.id !== 'l2-1' && lesson.id !== 'l2-2' && lesson.id !== 'l2-3' && lesson.id !== 'l2-4' && lesson.id !== 'l2-5' && (
-                  <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 relative group">
-                    <textarea
-                      value={userInput}
-                      onChange={(e) => setUserInput(e.target.value)}
-                      className="w-full h-full bg-transparent text-white font-mono text-sm outline-none resize-none"
-                      placeholder={lesson.id === 'l1-5' ? "아무런 질문이나 작성해 보세요..." : "여기에 질문을 입력하거나 위 문장을 따라 써보세요..."}
-                    />
-                    <div className="absolute bottom-5 right-5 flex gap-3">
-                      {(lesson.id === 'l2-6' || lesson.id === 'l2-7') && (
-                        <button
-                          onClick={() => onNavigateToLesson('l1-4')}
-                          className="px-6 py-3 bg-canva-purple text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg"
-                        >
-                          API 키 입력
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => {
-                          setUserInput('');
-                          setAiResponse('');
+                  <div className="text-gray-300 font-mono text-sm leading-relaxed markdown-container dark-markdown">
+                    {typeof aiResponse === 'object' && aiResponse?.type === 'compare' ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex-1 border border-gray-700 bg-gray-800 rounded-lg p-3 relative">
+                          <pre className="text-xs text-gray-400 whitespace-pre-wrap">{aiResponse.before}</pre>
+                        </div>
+                        <div className="flex-1 border border-canva-teal/50 bg-canva-teal/10 rounded-lg p-3 relative">
+                          <pre className="text-xs text-gray-200 whitespace-pre-wrap">{aiResponse.after}</pre>
+                        </div>
+                      </div>
+                    ) : typeof aiResponse === 'object' && aiResponse?.type === 'text' ? (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
                         }}
-                        disabled={isTyping}
-                        className="px-6 py-3 bg-gray-700 text-white rounded-xl font-bold text-sm hover:bg-gray-600 transition-all disabled:opacity-50 shadow-lg"
                       >
-                        초기화
-                      </button>
-                      <button 
-                        onClick={() => handleRun()}
-                        disabled={isTyping}
-                        className="px-8 py-3 bg-canva-teal text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-teal-900/20"
+                        {aiResponse.content}
+                      </ReactMarkdown>
+                    ) : (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+                        }}
                       >
-                        실행 (Run)
+                        {aiResponse as string}
+                      </ReactMarkdown>
+                    )}
+                    {isTyping && <span className="inline-block w-2 h-4 bg-canva-teal ml-1 animate-pulse"></span>}
+                    {!aiResponse && !isTyping && <span className="text-gray-600 italic">실행 버튼이나 결과 보기 버튼을 눌러 AI의 답변을 확인하세요.</span>}
+                  </div>
+                </div>
+                
+                {aiResponse && !isTyping && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-8 p-6 bg-canva-purple/10 border border-canva-purple/20 rounded-xl"
+                  >
+                    <h5 className="text-canva-purple font-bold text-xs mb-3 uppercase tracking-wider">학습 포인트</h5>
+                    <div className="text-sm text-white leading-relaxed markdown-container">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+                        }}
+                      >
+                        {learningPoint}
+                      </ReactMarkdown>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Navigation / Completion Buttons */}
+        <div className="p-6 border-t border-gray-800 flex justify-end gap-3 bg-[#0e1318] shrink-0">
+          <button 
+            onClick={() => onComplete(lesson.id)}
+            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              isCompleted 
+                ? 'bg-canva-teal text-white' 
+                : 'bg-canva-purple text-white hover:bg-opacity-90'
+            }`}
+          >
+            {isCompleted ? (
+              <><CheckCircle2 size={18} /> 학습 완료됨</>
+            ) : (
+              '학습 완료하기'
+            )}
+          </button>
+          <button 
+            onClick={() => {
+              onComplete(lesson.id);
+              onBack();
+            }}
+            className="px-6 py-3 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-700 transition-all flex items-center gap-2"
+          >
+            다음 레슨 <ArrowRight size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* M4 Result Popup Overlay */}
+      {m4PopupData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" style={{ minHeight: '100vh' }}>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-2xl w-full bg-[#1c232b] rounded-2xl shadow-2xl flex flex-col border border-gray-700 my-auto shadow-canva-purple/10"
+          >
+            <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                <span className="text-2xl">✨</span> {m4PopupData.title}
+              </h3>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh] no-scrollbar">
+              {typeof m4PopupData.content === 'string' ? (
+                <div className="relative">
+                  <div className="absolute top-4 right-4 flex items-center gap-2">
+                    {!m4PopupData.hideDocsButton && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(m4PopupData.content as string);
+                            window.open('https://docs.new', '_blank');
+                          } catch (err) {
+                            alert('클립보드 자동 복사에 실패했습니다. 수동으로 텍스트를 복사해주세요.');
+                          }
+                        }}
+                        className="text-xs text-white hover:bg-blue-600 transition-colors flex items-center gap-1 bg-blue-500 px-3 py-1.5 rounded-lg font-medium shadow-sm"
+                      >
+                        <FileText size={14} /> 구글Docs에 ctrl+v 하세요.
                       </button>
+                    )}
+                    <div className="text-gray-400 hover:text-white cursor-pointer px-2 py-1.5 bg-[#0e1318] hover:bg-gray-800 transition-colors rounded-lg flex items-center justify-center border border-gray-700" onClick={() => navigator.clipboard.writeText(m4PopupData.content as string)} title="클립보드에 복사">
+                      <Copy size={16} />
                     </div>
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-500 italic">
-                이 레슨은 실습이 포함되어 있지 않습니다.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom Right (3): Answer Guide */}
-        <div className="h-1/2 flex flex-col bg-[#0e1318]">
-          <div className="p-4 border-b border-gray-800 flex items-center justify-center">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">답변 안내</span>
-          </div>
-          <div className="flex-1 p-8 overflow-y-auto">
-            <div className="bg-[#1c232b] rounded-xl p-8 border border-gray-800 min-h-[160px] relative">
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-canva-teal rounded-full animate-pulse"></div>
-                  <span className="text-[10px] font-bold text-canva-teal uppercase tracking-widest">AI Response</span>
+                  <pre className={`text-sm text-gray-300 font-mono whitespace-pre-wrap bg-[#0e1318] p-6 ${!m4PopupData.hideDocsButton ? 'pt-14' : 'pt-14'} rounded-xl border border-gray-800 leading-relaxed max-w-full`}>
+                    {m4PopupData.content}
+                  </pre>
                 </div>
-                {(lesson.id === 'l2-6' || lesson.id === 'l2-7') && aiResponse && !isTyping && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(aiResponse);
-                      alert('복사되었습니다.');
-                    }}
-                    className="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1 bg-gray-800 px-3 py-1.5 rounded-lg"
-                  >
-                    <Copy size={14} /> AI response 내용 복사 하기
-                  </button>
-                )}
-              </div>
-              <div className="text-gray-300 font-mono text-sm leading-relaxed markdown-container dark-markdown">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    a: ({ node, ...props }) => (
-                      <a {...props} target="_blank" rel="noopener noreferrer" />
-                    ),
-                  }}
-                >
-                  {aiResponse}
-                </ReactMarkdown>
-                {isTyping && <span className="inline-block w-2 h-4 bg-canva-teal ml-1 animate-pulse"></span>}
-                {!aiResponse && !isTyping && <span className="text-gray-600 italic">실행 버튼을 눌러 AI의 답변을 확인하세요.</span>}
+              ) : (
+                m4PopupData.content
+              )}
+              
+              <div className="mt-8 bg-canva-purple/10 border border-canva-purple/20 p-5 rounded-xl flex gap-4 items-start">
+                <div className="text-xl mt-1">💡</div>
+                <div>
+                  <h4 className="text-canva-purple font-bold text-sm mb-1">학습 포인트</h4>
+                  <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{m4PopupData.point}</p>
+                </div>
               </div>
             </div>
             
-            {aiResponse && !isTyping && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-8 p-6 bg-canva-purple/10 border border-canva-purple/20 rounded-xl"
+            <div className="p-6 border-t border-gray-800 bg-[#141a21] rounded-b-2xl">
+              <button
+                onClick={closeM4Popup}
+                className="w-full py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all shadow-lg text-lg flex items-center justify-center gap-2"
               >
-                <h5 className="text-canva-purple font-bold text-xs mb-3 uppercase tracking-wider">학습 포인트</h5>
-                <div className="text-sm text-white leading-relaxed markdown-container">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      a: ({ node, ...props }) => (
-                        <a {...props} target="_blank" rel="noopener noreferrer" />
-                      ),
-                    }}
-                  >
-                    {learningPoint}
-                  </ReactMarkdown>
-                </div>
-              </motion.div>
-            )}
-          </div>
-          <div className="p-6 border-t border-gray-800 flex justify-end gap-3 bg-[#0e1318]">
-            <button 
-              onClick={() => onComplete(lesson.id)}
-              className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                isCompleted 
-                  ? 'bg-canva-teal text-white' 
-                  : 'bg-canva-purple text-white hover:bg-opacity-90'
-              }`}
-            >
-              {isCompleted ? (
-                <><CheckCircle2 size={18} /> 학습 완료됨</>
-              ) : (
-                '학습 완료하기'
-              )}
-            </button>
-            <button 
-              onClick={() => {
-                onComplete(lesson.id);
-                onBack();
-              }}
-              className="px-6 py-3 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-700 transition-all flex items-center gap-2"
-            >
-              다음 레슨 <ArrowRight size={18} />
-            </button>
-          </div>
+                창 닫기
+              </button>
+            </div>
+          </motion.div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
