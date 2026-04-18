@@ -1,12 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Home from './views/Home';
 import Tutorial from './views/Tutorial';
-import { ViewType } from './types';
+import { ViewType, Module } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('home');
+  const [selectedModule, setSelectedModule] = useState<Module | null>(null);
+  const [completedLessons, setCompletedLessons] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('ai-teachers-progress');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleViewChange = (view: ViewType) => {
+    setCurrentView(view);
+    if (view !== 'tutorial') setSelectedModule(null);
+  };
+
+  const toggleComplete = (lessonId: string) => {
+    setCompletedLessons(prev => {
+      const next = prev.includes(lessonId)
+        ? prev.filter(id => id !== lessonId)
+        : [...prev, lessonId];
+      localStorage.setItem('ai-teachers-progress', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const markComplete = (lessonId: string) => {
+    setCompletedLessons(prev => {
+      if (prev.includes(lessonId)) return prev;
+      const next = [...prev, lessonId];
+      localStorage.setItem('ai-teachers-progress', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const renderView = () => {
     switch (currentView) {
@@ -27,7 +60,13 @@ export default function App() {
           </div>
         );
       case 'tutorial':
-        return <Tutorial />;
+        return <Tutorial
+          selectedModule={selectedModule}
+          onSelectModule={setSelectedModule}
+          completedLessons={completedLessons}
+          onToggleComplete={toggleComplete}
+          onMarkComplete={markComplete}
+        />;
       default:
         return <Home onViewChange={setCurrentView} />;
     }
@@ -35,8 +74,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-canva-bg font-sans text-canva-ink">
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-      
+      <Sidebar
+        currentView={currentView}
+        onViewChange={handleViewChange}
+        selectedModule={selectedModule}
+        onSelectModule={(mod) => {
+          setCurrentView('tutorial');
+          setSelectedModule(mod);
+        }}
+        completedLessons={completedLessons}
+      />
+
       <main className="pl-64 min-h-screen">
         <AnimatePresence mode="wait">
           <motion.div
