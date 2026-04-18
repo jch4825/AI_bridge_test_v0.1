@@ -21,164 +21,342 @@ export const CopyButton = ({ text, className = "" }: { text: string, className?:
   );
 };
 
-// 5-1: 틀린 정보 찾기
+// 5-1: 틀린 정보 찾기 (클릭 선택 + 채점)
 export const Lesson51Interactive = () => {
   const [currentText, setCurrentText] = useState(0);
-  const [selectedWords, setSelectedWords] = useState<Set<number>>(new Set());
-  const [revealed, setRevealed] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [submitted, setSubmitted] = useState(false);
+  const [score, setScore] = useState(0);
+  const [roundScores, setRoundScores] = useState<number[]>([]);
+  const [finished, setFinished] = useState(false);
 
   const wrongTexts = [
     {
-      id: 'science',
-      text: '식물의 광합성은 주로 뿌리에서 이루어집니다. 식물은 이산화탄소와 물을 흡수하여 포도당과 산소를 만들어냅니다. 광합성에는 햇빛이 필요하며, 이 과정은 낮과 밤 모두 동일한 속도로 진행됩니다.',
-      wrongs: [
-        { start: '주로 뿌리에서', replacement: '잎의 엽록체에서' },
-        { start: '낮과 밤 모두 동일한 속도로', replacement: '밤에는 광합성이 중단되어' }
-      ]
+      sentences: [
+        { text: '식물의 광합성은 주로 뿌리에서 이루어집니다.', isWrong: true },
+        { text: '식물은 이산화탄소와 물을 흡수하여 포도당과 산소를 만들어냅니다.', isWrong: false },
+        { text: '광합성에는 햇빛이 필요하며, 이 과정은 낮과 밤 모두 동일한 속도로 진행됩니다.', isWrong: true },
+      ],
+      corrections: [
+        '"뿌리에서" → 실제로는 잎의 엽록체에서 이루어집니다.',
+        '"낮과 밤 모두 동일한 속도로" → 밤에는 빛이 없으므로 광합성이 중단됩니다.',
+      ],
     },
     {
-      id: 'history',
-      text: '훈민정음은 1443년 세종대왕이 신하들과 함께 창제하였으며, 1446년에 반포되었습니다. 훈민정음은 처음부터 28자로 구성되었으며 현재까지 동일하게 사용되고 있습니다.',
-      wrongs: [
-        { start: '처음부터 28자로', replacement: '현재 24자가 사용되며' }
-      ]
+      sentences: [
+        { text: '훈민정음은 1443년 세종대왕이 창제하였으며, 1446년에 반포되었습니다.', isWrong: false },
+        { text: '훈민정음은 처음부터 28자로 구성되었으며 현재까지 동일하게 사용되고 있습니다.', isWrong: true },
+      ],
+      corrections: [
+        '"현재까지 동일하게" → 현재는 24자가 사용됩니다. 창제 당시 28자 중 4자가 소멸되었습니다.',
+      ],
     },
     {
-      id: 'law',
-      text: '초등학교 현장체험학습은 교육부령 제2023-15호에 따라 연간 최대 30일까지 실시할 수 있으며, 보호자 동의서는 3일 전까지 제출해야 합니다.',
-      wrongs: [
-        { start: '교육부령 제2023-15호', replacement: '(이것은 존재하지 않는 할루시네이션 예시)' }
-      ]
-    }
+      sentences: [
+        { text: '초등학교 현장체험학습은 교육부령 제2023-15호에 따라 연간 최대 30일까지 실시할 수 있으며,', isWrong: true },
+        { text: '보호자 동의서는 출발 3일 전까지 제출해야 합니다.', isWrong: false },
+      ],
+      corrections: [
+        '"교육부령 제2023-15호" → 존재하지 않는 법령입니다. 구체적인 법령 번호를 AI가 지어낸 전형적인 할루시네이션 사례입니다.',
+      ],
+    },
   ];
 
-  const handleCheck = () => {
-    setRevealed(true);
+  const current = wrongTexts[currentText];
+
+  const toggle = (idx: number) => {
+    if (submitted) return;
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      return next;
+    });
+  };
+
+  const handleSubmit = () => {
+    let roundScore = 0;
+    current.sentences.forEach((s, idx) => {
+      if (s.isWrong && selected.has(idx)) roundScore += 10;
+      if (!s.isWrong && selected.has(idx)) roundScore -= 5;
+    });
+    setScore(prev => prev + roundScore);
+    setRoundScores(prev => [...prev, roundScore]);
+    setSubmitted(true);
   };
 
   const handleNext = () => {
     if (currentText < wrongTexts.length - 1) {
-      setCurrentText(currentText + 1);
-      setSelectedWords(new Set());
-      setRevealed(false);
+      setCurrentText(prev => prev + 1);
+      setSelected(new Set());
+      setSubmitted(false);
+    } else {
+      setFinished(true);
     }
   };
 
+  const handleReset = () => {
+    setCurrentText(0); setSelected(new Set());
+    setSubmitted(false); setScore(0);
+    setRoundScores([]); setFinished(false);
+  };
+
+  if (finished) {
+    const maxScore = wrongTexts.reduce((acc, t) => acc + t.sentences.filter(s => s.isWrong).length * 10, 0);
+    const grade = score >= maxScore * 0.8 ? { label: '우수', color: 'text-green-400' }
+      : score >= maxScore * 0.4 ? { label: '양호', color: 'text-yellow-400' }
+      : { label: '개선 필요', color: 'text-red-400' };
+    return (
+      <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-5 items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-400 text-sm mb-1">검수 완료</div>
+          <div className={`text-3xl font-bold mb-3 ${grade.color}`}>{grade.label}</div>
+          <div className="bg-gray-800 rounded-xl px-8 py-4">
+            <div className="text-gray-400 text-xs mb-1">총 점수</div>
+            <div className="text-white font-bold text-3xl">{score}점</div>
+            <div className="text-gray-500 text-xs mt-1">최대 {maxScore}점</div>
+          </div>
+          <div className="mt-3 text-xs text-gray-500">정답 문장 선택 +10점 · 오선택 -5점</div>
+        </div>
+        <button onClick={handleReset} className="px-5 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors">
+          다시 시작
+        </button>
+      </div>
+    );
+  }
+
+  const lastRoundScore = roundScores[roundScores.length - 1];
+
   return (
     <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-4 overflow-y-auto">
-      <div className="text-white font-bold mb-2">틀린 정보 찾기 인터랙티브</div>
-
-      <div className="bg-gray-900 p-4 rounded-lg text-sm text-gray-200 leading-relaxed">
-        <p>{wrongTexts[currentText].text}</p>
+      <div className="flex items-center justify-between">
+        <div className="text-white font-bold text-sm">틀린 정보 찾기</div>
+        <div className="text-xs text-gray-500">{currentText + 1} / {wrongTexts.length}</div>
       </div>
 
-      {revealed && (
-        <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 text-sm text-blue-100">
-          <div className="font-bold mb-2">정답:</div>
-          {wrongTexts[currentText].wrongs.map((wrong, idx) => (
-            <div key={idx} className="mb-2">
-              <span className="text-red-400">❌ "{wrong.start}"</span>
-              <div className="text-green-400 ml-4">✓ {wrong.replacement}</div>
+      <div className="bg-gray-800/40 rounded-lg p-3 text-xs text-gray-400 leading-relaxed">
+        AI가 생성한 텍스트입니다. <span className="text-canva-purple font-semibold">할루시네이션이 포함된 문장을 클릭</span>하여 선택하고 제출하세요.
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {current.sentences.map((s, idx) => {
+          const isSel = selected.has(idx);
+          let cls = 'bg-gray-800 hover:bg-gray-700 border border-transparent cursor-pointer';
+          if (submitted) {
+            if (s.isWrong && isSel) cls = 'bg-green-900/40 border border-green-600 cursor-default';
+            else if (!s.isWrong && isSel) cls = 'bg-red-900/40 border border-red-600 cursor-default';
+            else if (s.isWrong && !isSel) cls = 'bg-orange-900/30 border border-orange-700 cursor-default';
+            else cls = 'bg-gray-800 border border-transparent cursor-default';
+          } else if (isSel) {
+            cls = 'bg-canva-purple/20 border border-canva-purple cursor-pointer';
+          }
+          return (
+            <div key={idx} onClick={() => toggle(idx)}
+              className={`p-3 rounded-lg text-sm text-gray-200 leading-relaxed transition-all ${cls}`}>
+              <span>{s.text}</span>
+              {submitted && s.isWrong && isSel && <span className="ml-2 text-green-400 text-xs font-bold">✓ +10점</span>}
+              {submitted && !s.isWrong && isSel && <span className="ml-2 text-red-400 text-xs font-bold">✗ -5점</span>}
+              {submitted && s.isWrong && !isSel && <span className="ml-2 text-orange-400 text-xs font-bold">△ 놓침</span>}
             </div>
+          );
+        })}
+      </div>
+
+      {submitted && (
+        <div className="bg-blue-900/20 border border-blue-800/60 rounded-lg p-4 text-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-blue-300 font-bold text-xs">해설</span>
+            <span className={`text-xs font-bold ${lastRoundScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              이번 라운드 {lastRoundScore > 0 ? '+' : ''}{lastRoundScore}점
+            </span>
+          </div>
+          {current.corrections.map((c, i) => (
+            <div key={i} className="text-gray-300 text-xs mb-1">• {c}</div>
           ))}
         </div>
       )}
 
-      <div className="flex gap-2">
-        <button
-          onClick={handleCheck}
-          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg py-2 px-3 text-sm font-medium transition-colors"
-        >
-          정답 확인
-        </button>
-        {currentText < wrongTexts.length - 1 && (
-          <button
-            onClick={handleNext}
-            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-2 px-3 text-sm font-medium transition-colors"
-          >
-            다음 텍스트
+      <div className="flex gap-2 mt-auto">
+        {!submitted ? (
+          <button onClick={handleSubmit} disabled={selected.size === 0}
+            className="flex-1 bg-canva-purple hover:bg-canva-purple/80 disabled:opacity-40 text-white rounded-lg py-2.5 text-sm font-bold transition-colors">
+            제출
+          </button>
+        ) : (
+          <button onClick={handleNext}
+            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-2.5 text-sm font-bold transition-colors">
+            {currentText < wrongTexts.length - 1 ? '다음 →' : '결과 보기'}
           </button>
         )}
       </div>
 
-      <div className="text-xs text-gray-400 mt-auto pt-4 border-t border-gray-700">
-        {currentText + 1} / {wrongTexts.length}
+      <div className="text-xs text-gray-500 text-right">
+        누적 점수: <span className="text-white font-bold">{score}점</span>
       </div>
     </div>
   );
 };
 
-// 5-2: 편향 탐지
+// 5-2: 편향 탐지 (슬라이더 평가 + 채점)
 export const Lesson52Interactive = () => {
   const [currentBias, setCurrentBias] = useState(0);
-  const [revealed, setRevealed] = useState(false);
+  const [sliderValue, setSliderValue] = useState(50);
+  const [submitted, setSubmitted] = useState(false);
+  const [totalScore, setTotalScore] = useState(0);
+  const [roundResults, setRoundResults] = useState<{ user: number; target: number; diff: number }[]>([]);
+  const [finished, setFinished] = useState(false);
 
   const biases = [
     {
       role: '간호사',
       description: '간호사는 공감 능력이 뛰어나고 세심한 여성입니다. 환자를 돌보고 의사를 보조합니다.',
-      biasPoints: ['특정 성별 중심 서술']
+      biasLevel: 85,
+      biasPoints: ['특정 성별(여성)로 고정 서술', '"의사를 보조" — 직업 위계 고정'],
+      improvement: '"간호사는 공감 능력이 뛰어난 전문 의료인입니다. 환자를 돌봅니다."',
     },
     {
       role: '수학 천재 학생',
       description: '수학 천재 학생은 안경을 쓰고 있으며, 특정 국적의 학생입니다. 수학 올림피아드에서 메달을 딴 경험이 있습니다.',
-      biasPoints: ['특정 외모 · 국적 연상']
+      biasLevel: 70,
+      biasPoints: ['특정 외모(안경) 고정', '특정 국적 연상'],
+      improvement: '"수학 천재 학생은 문제 해결에 열정적입니다. 수학 올림피아드에서 메달을 딴 경험이 있습니다."',
     },
     {
       role: '행복한 가족',
       description: '행복한 가족은 엄마, 아빠, 그리고 두 명의 자녀로 구성됩니다. 함께 저녁 식사를 하는 모습이 따뜻합니다.',
-      biasPoints: ['핵가족 중심, 다양한 가족 구조 배제']
-    }
+      biasLevel: 60,
+      biasPoints: ['핵가족 중심 서술', '한부모·조손가정 등 다양한 가족 형태 배제'],
+      improvement: '"행복한 가족은 서로를 아끼고 함께 시간을 보냅니다. 저녁 식사를 함께 하는 모습이 따뜻합니다."',
+    },
   ];
 
-  const handleReveal = () => {
-    setRevealed(true);
+  const current = biases[currentBias];
+
+  const getPoints = (diff: number) => {
+    if (diff <= 10) return 10;
+    if (diff <= 20) return 7;
+    if (diff <= 30) return 4;
+    return 1;
+  };
+
+  const handleSubmit = () => {
+    const diff = Math.abs(sliderValue - current.biasLevel);
+    const pts = getPoints(diff);
+    setTotalScore(prev => prev + pts);
+    setRoundResults(prev => [...prev, { user: sliderValue, target: current.biasLevel, diff }]);
+    setSubmitted(true);
   };
 
   const handleNext = () => {
     if (currentBias < biases.length - 1) {
-      setCurrentBias(currentBias + 1);
-      setRevealed(false);
+      setCurrentBias(prev => prev + 1);
+      setSliderValue(50);
+      setSubmitted(false);
+    } else {
+      setFinished(true);
     }
   };
 
+  const handleReset = () => {
+    setCurrentBias(0); setSliderValue(50);
+    setSubmitted(false); setTotalScore(0);
+    setRoundResults([]); setFinished(false);
+  };
+
+  if (finished) {
+    const maxScore = biases.length * 10;
+    const pct = Math.round((totalScore / maxScore) * 100);
+    const label = pct >= 80 ? '우수' : pct >= 50 ? '양호' : '개선 필요';
+    const color = pct >= 80 ? 'text-green-400' : pct >= 50 ? 'text-yellow-400' : 'text-red-400';
+    return (
+      <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-5 items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-400 text-sm mb-1">편향 탐지 완료</div>
+          <div className={`text-3xl font-bold mb-3 ${color}`}>{label}</div>
+          <div className="bg-gray-800 rounded-xl px-8 py-4">
+            <div className="text-gray-400 text-xs mb-1">정확도</div>
+            <div className="text-white font-bold text-3xl">{pct}%</div>
+            <div className="text-gray-500 text-xs mt-1">오차 10% 이내 +10점 · 20% 이내 +7점 · 30% 이내 +4점</div>
+          </div>
+        </div>
+        <button onClick={handleReset} className="px-5 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors">
+          다시 시작
+        </button>
+      </div>
+    );
+  }
+
+  const lastResult = roundResults[roundResults.length - 1];
+
   return (
     <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-4 overflow-y-auto">
-      <div className="text-white font-bold mb-2">편향 탐지 체험</div>
-
-      <div className="bg-gray-900 p-4 rounded-lg text-sm">
-        <div className="text-gray-400 mb-2">역할: <span className="text-white font-bold">{biases[currentBias].role}</span></div>
-        <p className="text-gray-200 leading-relaxed">{biases[currentBias].description}</p>
+      <div className="flex items-center justify-between">
+        <div className="text-white font-bold text-sm">편향 탐지</div>
+        <div className="text-xs text-gray-500">{currentBias + 1} / {biases.length}</div>
       </div>
 
-      {revealed && (
-        <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 text-sm text-yellow-100">
-          <div className="font-bold mb-2">편향 요소:</div>
-          {biases[currentBias].biasPoints.map((point, idx) => (
-            <div key={idx} className="text-yellow-400">⚠️ {point}</div>
-          ))}
+      <div className="bg-gray-800/40 rounded-lg p-3 text-xs text-gray-400 leading-relaxed">
+        아래 AI 생성 문장의 <span className="text-canva-purple font-semibold">편향 정도를 슬라이더로 평가</span>하고 제출하세요.
+      </div>
+
+      <div className="bg-gray-900 rounded-lg p-4">
+        <div className="text-gray-400 text-xs mb-2">역할: <span className="text-white font-semibold">{current.role}</span></div>
+        <p className="text-gray-200 text-sm leading-relaxed">{current.description}</p>
+      </div>
+
+      <div className="bg-gray-800/40 rounded-lg p-4">
+        <div className="flex justify-between text-xs text-gray-400 mb-3">
+          <span>편향 없음</span>
+          <span className="font-bold text-white text-sm">{sliderValue}%</span>
+          <span>편향 강함</span>
+        </div>
+        <input
+          type="range" min="0" max="100" value={sliderValue}
+          onChange={e => { if (!submitted) setSliderValue(Number(e.target.value)); }}
+          disabled={submitted}
+          className="w-full h-2 rounded-full cursor-pointer disabled:cursor-default"
+          style={{ accentColor: '#7F77DD' }}
+        />
+        <div className="flex justify-between mt-1 text-[10px] text-gray-600">
+          <span>0</span><span>50</span><span>100</span>
+        </div>
+      </div>
+
+      {submitted && (
+        <div className="bg-blue-900/20 border border-blue-800/60 rounded-lg p-4 text-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-blue-300 font-bold text-xs">분석 결과</span>
+            <span className="text-xs text-gray-400">
+              정답 {lastResult.target}% · 내 답 {lastResult.user}% · 오차 {lastResult.diff}%
+            </span>
+          </div>
+          <div className="mb-3">
+            {current.biasPoints.map((p, i) => (
+              <div key={i} className="text-gray-300 text-xs mb-1">• {p}</div>
+            ))}
+          </div>
+          <div className="bg-gray-800/50 rounded p-2 text-xs">
+            <span className="text-green-400 font-semibold">개선 예시: </span>
+            <span className="text-gray-300">{current.improvement}</span>
+          </div>
         </div>
       )}
 
-      <div className="flex gap-2">
-        <button
-          onClick={handleReveal}
-          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg py-2 px-3 text-sm font-medium transition-colors"
-        >
-          편향 요소 보기
-        </button>
-        {currentBias < biases.length - 1 && (
-          <button
-            onClick={handleNext}
-            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-2 px-3 text-sm font-medium transition-colors"
-          >
-            다음 사례
+      <div className="flex gap-2 mt-auto">
+        {!submitted ? (
+          <button onClick={handleSubmit}
+            className="flex-1 bg-canva-purple hover:bg-canva-purple/80 text-white rounded-lg py-2.5 text-sm font-bold transition-colors">
+            제출
+          </button>
+        ) : (
+          <button onClick={handleNext}
+            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-2.5 text-sm font-bold transition-colors">
+            {currentBias < biases.length - 1 ? '다음 →' : '결과 보기'}
           </button>
         )}
       </div>
 
-      <div className="text-xs text-gray-400 mt-auto pt-4 border-t border-gray-700">
-        {currentBias + 1} / {biases.length}
+      <div className="text-xs text-gray-500 text-right">
+        누적 점수: <span className="text-white font-bold">{totalScore}점</span>
       </div>
     </div>
   );
