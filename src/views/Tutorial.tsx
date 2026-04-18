@@ -12,15 +12,26 @@ import {
   Lesson43Interactive,
   Lesson44Interactive,
   Lesson45Interactive,
-  Lesson46Interactive
+  Lesson46Interactive,
+  Lesson47Interactive
 } from './Module4Components';
+import {
+  Lesson51Interactive,
+  Lesson52Interactive,
+  Lesson53Interactive,
+  Lesson54Interactive,
+  Lesson55Interactive,
+  Lesson56Interactive
+} from './Module5Components';
 
 let module4PrinciplesShown = false;
 
 interface LessonViewerProps {
   lesson: Lesson;
   onBack: () => void;
-  onComplete: (lessonId: string) => void;
+  onModuleComplete: () => void;
+  onToggleComplete: (lessonId: string) => void;
+  onMarkComplete: (lessonId: string) => void;
   isCompleted: boolean;
   onNavigateToLesson: (lessonId: string) => void;
 }
@@ -49,12 +60,21 @@ const LEARNING_POINTS: Record<string, string[]> = {
   ]
 };
 
-function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLesson }: LessonViewerProps) {
+function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMarkComplete, isCompleted, onNavigateToLesson }: LessonViewerProps) {
   const [userInput, setUserInput] = useState(lesson.interactive?.initialInput || '');
   const [aiResponse, setAiResponse] = useState<any>('');
   const [isTyping, setIsTyping] = useState(false);
   const [learningPoint, setLearningPoint] = useState('');
   const [showOverlay, setShowOverlay] = useState(false);
+
+  // 현재 모듈의 레슨 순서에서 다음 레슨 계산 (l1-4 숏컷 제외)
+  const nextLesson = (() => {
+    const moduleLessons = lessons
+      .filter(l => l.moduleId === lesson.moduleId)
+      .sort((a, b) => a.order - b.order);
+    const currentIndex = moduleLessons.findIndex(l => l.id === lesson.id);
+    return currentIndex >= 0 ? moduleLessons[currentIndex + 1] ?? null : null;
+  })();
 
   // M4 Popup State
   const [m4PopupData, setM4PopupData] = useState<{title: string, content: React.ReactNode, point: string, hideDocsButton?: boolean} | null>(null);
@@ -211,7 +231,7 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0e1318]">
+    <div className="flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden bg-[#0e1318]">
       {showOverlay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 overflow-y-auto" style={{ minHeight: '100vh' }}>
           <div className="bg-white rounded-xl max-w-[480px] w-full p-8 shadow-2xl relative">
@@ -253,7 +273,7 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
         </div>
       )}
       {/* Left Side (1 & 4): Explanation */}
-      <div className="w-1/2 border-r border-gray-800 flex flex-col bg-white min-w-0">
+      <div className="w-full lg:w-2/5 lg:border-r border-gray-800 flex flex-col bg-white min-w-0 md:min-h-auto lg:h-full lg:overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pr-4">
             <button 
@@ -291,7 +311,7 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
               })()}
             </div>
           </div>
-          <span className="text-[10px] font-bold text-canva-purple uppercase tracking-widest flex-shrink-0 ml-2">Explanation</span>
+          <span className="text-[10px] font-bold text-canva-purple uppercase tracking-widest flex-shrink-0 ml-2 hidden md:inline">Explanation</span>
         </div>
         <div className="flex-1 overflow-y-auto p-10 min-w-0 bg-white relative">
           <div className="w-full pb-20" style={{ maxWidth: '40em' }}>
@@ -341,11 +361,11 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
       </div>
 
       {/* Right Side (2 & 3) */}
-      <div className="w-1/2 flex flex-col">
-        <div className="flex-1 flex flex-col min-h-0 relative">
+      <div className="w-full lg:w-3/5 flex flex-col lg:h-full lg:overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
           {/* Main interactive area: full height for m4, otherwise top half */}
-          <div className={`flex flex-col bg-[#0e1318] border-gray-800 ${lesson.moduleId === 'm4' ? 'flex-1' : 'h-1/2 border-b'}`}>
-            <div className="p-4 border-b border-gray-800 flex items-center justify-center shrink-0">
+          <div className={`flex flex-col bg-[#0e1318] border-gray-800 min-h-0 ${lesson.moduleId === 'm4' ? 'flex-1' : 'lg:flex-[3] lg:border-b md:flex-1'}`}>
+            <div className="p-4 border-b border-gray-800 flex items-center justify-center shrink-0 hidden md:flex">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">문제 입력</span>
             </div>
             <div className={`flex-1 p-8 flex flex-col overflow-y-auto no-scrollbar`}>
@@ -398,7 +418,17 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
                       {lesson.id === 'l4-3' && <Lesson43Interactive onExecute={handleM4Execute} />}
                       {lesson.id === 'l4-4' && <Lesson44Interactive onExecute={handleM4Execute} />}
                       {lesson.id === 'l4-5' && <Lesson45Interactive onExecute={handleM4Execute} />}
-                      {lesson.id === 'l4-6' && <Lesson46Interactive onExecute={handleM4Execute} />}
+                      {lesson.id === 'l4-6' && <Lesson47Interactive onExecute={handleM4Execute} />}
+                      {lesson.id === 'l4-7' && <Lesson46Interactive onExecute={handleM4Execute} />}
+                    </>
+                  ) : lesson.moduleId === 'm5' ? (
+                    <>
+                      {lesson.id === 'l5-1' && <Lesson51Interactive />}
+                      {lesson.id === 'l5-2' && <Lesson52Interactive />}
+                      {lesson.id === 'l5-3' && <Lesson53Interactive />}
+                      {lesson.id === 'l5-4' && <Lesson54Interactive />}
+                      {lesson.id === 'l5-5' && <Lesson55Interactive />}
+                      {lesson.id === 'l5-6' && <Lesson56Interactive />}
                     </>
                   ) : lesson.id !== 'l2-1' && lesson.id !== 'l2-2' && lesson.id !== 'l2-3' && lesson.id !== 'l2-4' && lesson.id !== 'l2-5' && lesson.id !== 'l3-1' && (
                     <div className="flex-1 bg-[#1c232b] rounded-xl p-5 border border-gray-800 relative group min-h-[200px]">
@@ -448,8 +478,8 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
 
           {/* AI Response area (Hidden for M4 because it uses popup) */}
           {lesson.moduleId !== 'm4' && (
-            <div className="h-1/2 flex flex-col bg-[#0e1318]">
-              <div className="p-4 border-b border-gray-800 flex items-center justify-center shrink-0">
+            <div className="lg:flex-[2] flex flex-col bg-[#0e1318] min-h-0 md:hidden lg:flex border-t border-gray-800">
+              <div className="p-4 border-b border-gray-800 flex items-center justify-center shrink-0 hidden md:flex">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">답변 안내</span>
               </div>
               <div className="flex-1 p-8 overflow-y-auto no-scrollbar">
@@ -539,12 +569,12 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
         </div>
         
         {/* Navigation / Completion Buttons */}
-        <div className="p-6 border-t border-gray-800 flex justify-end gap-3 bg-[#0e1318] shrink-0">
-          <button 
-            onClick={() => onComplete(lesson.id)}
+        <div className="sticky bottom-0 p-6 border-t border-gray-800 flex justify-end gap-3 bg-[#0e1318] shrink-0 z-10">
+          <button
+            onClick={() => onToggleComplete(lesson.id)}
             className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              isCompleted 
-                ? 'bg-canva-teal text-white' 
+              isCompleted
+                ? 'bg-canva-teal text-white'
                 : 'bg-canva-purple text-white hover:bg-opacity-90'
             }`}
           >
@@ -554,14 +584,18 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
               '학습 완료하기'
             )}
           </button>
-          <button 
+          <button
             onClick={() => {
-              onComplete(lesson.id);
-              onBack();
+              onMarkComplete(lesson.id);
+              if (nextLesson) {
+                onNavigateToLesson(nextLesson.id);
+              } else {
+                onModuleComplete();
+              }
             }}
             className="px-6 py-3 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-700 transition-all flex items-center gap-2"
           >
-            다음 레슨 <ArrowRight size={18} />
+            {nextLesson ? <><span>다음 레슨</span><ArrowRight size={18} /></> : <><span>모듈 완료</span><CheckCircle2 size={18} /></>}
           </button>
         </div>
       </div>
@@ -635,27 +669,24 @@ function LessonViewer({ lesson, onBack, onComplete, isCompleted, onNavigateToLes
   );
 }
 
-export default function Tutorial() {
-  const [selectedModule, setSelectedModule] = useState<Module | null>(null);
+interface TutorialProps {
+  selectedModule: Module | null;
+  onSelectModule: (module: Module | null) => void;
+  completedLessons: string[];
+  onToggleComplete: (lessonId: string) => void;
+  onMarkComplete: (lessonId: string) => void;
+}
+
+export default function Tutorial({ selectedModule, onSelectModule, completedLessons, onToggleComplete, onMarkComplete }: TutorialProps) {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
-  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
 
-  // Load progress from localStorage
+  // 사이드바에서 모듈이 바뀌면 현재 레슨 초기화
   useEffect(() => {
-    const saved = localStorage.getItem('ai-teachers-progress');
-    if (saved) {
-      setCompletedLessons(JSON.parse(saved));
-    }
-  }, []);
+    setCurrentLesson(null);
+  }, [selectedModule?.id]);
 
-  const toggleComplete = (lessonId: string) => {
-    const newProgress = completedLessons.includes(lessonId)
-      ? completedLessons.filter(id => id !== lessonId)
-      : [...completedLessons, lessonId];
-    
-    setCompletedLessons(newProgress);
-    localStorage.setItem('ai-teachers-progress', JSON.stringify(newProgress));
-  };
+  const toggleComplete = onToggleComplete;
+  const markComplete = onMarkComplete;
 
   const renderModuleList = () => (
     <div className="max-w-4xl mx-auto p-10">
@@ -676,7 +707,7 @@ export default function Tutorial() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              onClick={() => setSelectedModule(module)}
+              onClick={() => onSelectModule(module)}
               className="bg-white border border-canva-border rounded-2xl p-6 hover:shadow-md transition-all cursor-pointer group flex items-center gap-6"
             >
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${
@@ -719,7 +750,7 @@ export default function Tutorial() {
     return (
       <div className="max-w-4xl mx-auto p-10">
         <button 
-          onClick={() => setSelectedModule(null)}
+          onClick={() => onSelectModule(null)}
           className="flex items-center gap-2 text-canva-gray hover:text-canva-ink mb-8 font-bold text-sm transition-colors"
         >
           <ArrowLeft size={16} /> 모듈 목록으로 돌아가기
@@ -771,10 +802,15 @@ export default function Tutorial() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <LessonViewer 
-              lesson={currentLesson} 
-              onBack={() => setCurrentLesson(null)} 
-              onComplete={toggleComplete}
+            <LessonViewer
+              lesson={currentLesson}
+              onBack={() => setCurrentLesson(null)}
+              onModuleComplete={() => {
+                setCurrentLesson(null);
+                onSelectModule(null);
+              }}
+              onToggleComplete={toggleComplete}
+              onMarkComplete={markComplete}
               isCompleted={completedLessons.includes(currentLesson.id)}
               onNavigateToLesson={(id) => {
                 const lesson = lessons.find(l => l.id === id);

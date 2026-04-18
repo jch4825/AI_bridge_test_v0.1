@@ -130,6 +130,51 @@ ${selectedRules.join('\n')}
 };
 
 export const Lesson43Interactive = ({ onExecute }: { onExecute: (data: {title: string, content: React.ReactNode, point: string, hideDocsButton?: boolean}) => void }) => {
+  const canvasPrompt = `학생 이름을 입력하면 다음 3가지를 자동 생성해 주는 간단한 웹 도구를 만들어줘:
+1) 그 학생을 위한 칭찬 문구 3가지 (학습 태도/교우 관계/노력 측면)
+2) 복사 버튼
+3) "다른 문구 보기" 새로고침 버튼
+색감은 부드러운 파스텔 톤으로, 초등학교 교사가 쓴다는 느낌으로 만들어줘.`;
+
+  const handleTest = () => {
+    onExecute({
+      title: 'Gemini Canvas 체험 시뮬레이션 결과',
+      content: `### 🎨 Gemini Canvas가 즉시 생성하는 화면 (예상)\n\n\`\`\`text\n[Canvas 미리보기]\n\n┌─────────────────────────────────────┐\n│  🌸 학생 칭찬 문구 생성기           │\n├─────────────────────────────────────┤\n│  학생 이름: [김하늘        ]        │\n│                                     │\n│  [ ✨ 칭찬 문구 생성하기 ]          │\n│                                     │\n│  💬 생성된 칭찬:                    │\n│  1. "김하늘 학생은 모둠 활동에서…"   │\n│  2. "꾸준히 숙제를 제출하는 모습…"   │\n│  3. "친구를 배려하는 태도가…"        │\n│                                     │\n│  [ 📋 복사 ]  [ 🔄 다른 문구 보기 ]  │\n└─────────────────────────────────────┘\n\n(대화창 안에서 바로 동작. 수정하고 싶으면 "버튼 색을 보라색으로 바꿔줘" 같이 말만 하면 됨.)\n\`\`\``,
+      point: '단 한 번의 자연어 지시만으로 버튼·입력창·출력 영역이 모두 작동하는 미니 도구가 만들어집니다. 이것이 가장 낮은 진입 장벽의 바이브 코딩이며, 다음 4-4에서는 이를 영구 재사용 가능한 "앱"으로 확장합니다.',
+      hideDocsButton: true
+    });
+  };
+
+  return (
+    <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-4 overflow-y-auto">
+      <div className="text-white font-bold mb-2">Gemini Canvas 체험 가이드</div>
+
+      <div className="text-sm text-gray-300 bg-gray-800/50 p-4 rounded-lg">
+        <ul className="list-decimal pl-4 space-y-2">
+          <li><a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" className="text-canva-teal hover:underline font-bold">Google Gemini</a> 에 접속해 로그인합니다.</li>
+          <li>입력창 하단의 <strong>[Canvas]</strong> 옵션을 켭니다.</li>
+          <li>아래 예시 프롬프트를 붙여 넣고 전송합니다. 오른쪽 Canvas 창에 즉시 작동하는 도구가 생성됩니다.</li>
+          <li>추가 대화로 색상·기능을 조정해 봅니다. (예: "버튼 색을 보라색으로 바꿔줘")</li>
+        </ul>
+      </div>
+
+      <div className="relative bg-[#1c232b] p-4 rounded-lg border border-gray-700">
+        <div className="text-xs font-bold text-gray-400 mb-2">Canvas에 붙여넣을 예시 프롬프트</div>
+        <CopyButton text={canvasPrompt} />
+        <pre className="text-xs text-canva-gray whitespace-pre-wrap font-mono mt-2">{canvasPrompt}</pre>
+      </div>
+
+      <div className="mt-2 text-sm">
+        <div className="text-xs text-gray-400 mb-2">Canvas가 만들어낼 결과 시뮬레이션</div>
+        <div className="flex gap-2">
+          <button onClick={handleTest} className="w-full py-3 bg-canva-teal text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg">Gemini Canvas 결과 미리보기</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const Lesson44Interactive = ({ onExecute }: { onExecute: (data: {title: string, content: React.ReactNode, point: string, hideDocsButton?: boolean}) => void }) => {
   const promptText = `(여기에 4-1에서 만든 학교 시스템 프롬프트를 붙여넣으세요)
 
 (여기에 4-2에서 만든 행정 업무 하네스를 적절히 붙여넣으세요)
@@ -173,7 +218,7 @@ export const Lesson43Interactive = ({ onExecute }: { onExecute: (data: {title: s
   );
 };
 
-export const Lesson44Interactive = ({ onExecute }: { onExecute: (data: {title: string, content: React.ReactNode, point: string}) => void }) => {
+export const Lesson47Interactive = ({ onExecute }: { onExecute: (data: {title: string, content: React.ReactNode, point: string}) => void }) => {
   const [selectedOpt, setSelectedOpt] = useState('');
   
   const promptText = `당신은 초등학교 가정통신문 작성 전문 도우미입니다.
