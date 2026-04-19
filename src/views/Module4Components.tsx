@@ -219,79 +219,302 @@ export const Lesson44Interactive = ({ onExecute }: { onExecute: (data: {title: s
 };
 
 export const Lesson47Interactive = ({ onExecute }: { onExecute: (data: {title: string, content: React.ReactNode, point: string}) => void }) => {
-  const [selectedOpt, setSelectedOpt] = useState('');
-  
-  const promptText = `당신은 초등학교 가정통신문 작성 전문 도우미입니다.
+  const [step, setStep] = useState(1);
+  const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSent, setChatSent] = useState(false);
+  const [aiTyping, setAiTyping] = useState(false);
+  const [showResponse, setShowResponse] = useState(false);
 
-가정통신문 작성 규칙:
-1. 업로드된 예시 파일의 형식과 어조를 참고합니다
-2. 상단: 학교명 + 날짜 + 담당 교사
-3. 본문: 목적 → 내용 → 안내사항 → 문의처
-4. 최하단: "※ 이 문서는 초안입니다. 검토 후 사용하세요."
-
-추가 규칙:
-- 날짜·장소·금액 등 미확정 정보는 [  ] 표시
-- 불필요한 수식어 없이 핵심만 전달`;
-
-  const getRecommendation = (opt: string) => {
-    switch(opt) {
-      case 'google': return "👉 Google AI Studio (무료, 구글 생태계)";
-      case 'quality': return "👉 Claude Project / Skill (한국어 우수)";
-      case 'free': return "👉 Google AI Studio (기본 한도 내 무료)";
-      case 'learn': return "👉 Claude Project (문서 형태 학습 용이)";
-      default: return "";
-    }
+  const handleUpload = () => {
+    setUploading(true);
+    setTimeout(() => {
+      setUploading(false);
+      setUploaded(true);
+      setStep(5);
+    }, 1600);
   };
 
-  const handleTest = () => {
+  const handleChatSend = () => {
+    if (!chatInput.trim()) return;
+    setChatSent(true);
+    setAiTyping(true);
+    setTimeout(() => {
+      setAiTyping(false);
+      setShowResponse(true);
+    }, 1800);
+  };
+
+  const handleComplete = () => {
     const resultJSX = (
       <div className="flex flex-col gap-3 w-full">
-        <div className="border border-gray-700 bg-gray-800 rounded-lg p-4 relative">
-          <h4 className="text-gray-300 font-bold mb-2">Google AI Studio 결과 (무료 에이전트)</h4>
-          <pre className="text-xs text-gray-400 whitespace-pre-wrap">■ 일시: 2024년 ○월 ○일\n■ 장소: [장소명]\n■ 준비물: 도시락 등\n\n(형식은 동일하나 문체가 다소 기계적이고 직접적/구조적)</pre>
+        <div className="border border-canva-teal/50 bg-canva-teal/10 rounded-lg p-4">
+          <h4 className="text-canva-teal font-bold mb-2">✅ Skill 연결 후 AI 응답</h4>
+          <pre className="text-xs text-gray-200 whitespace-pre-wrap leading-relaxed">{`[HWPX 공문/기안문 자동 채우기 스킬 v2] 호출됨
+
+✓ 기안문 서식 적용 완료
+✓ 수신·참조·제목·본문·붙임 자동 구성
+✓ 행정 어체 변환 완료
+
+📎 현장체험학습_기안문.hwpx (생성 완료)
+  → 한글 2020 이상에서 바로 열림`}</pre>
         </div>
-        <div className="border border-canva-teal/50 bg-canva-teal/10 rounded-lg p-4 relative">
-           <h4 className="text-canva-teal font-bold mb-2">Claude Skill 결과 (문서 업로드 학습형)</h4>
-          <pre className="text-xs text-gray-200 whitespace-pre-wrap">따스한 봄기운이 만연한 요즘, 가정에 평안이 깃드시길 바랍니다.\n금번 본교 4학년에서는 교과 과정과 연계된 현장체험학습을 아래와 같이 추진하고자 하오니, 학부모님들의 많은 협조를 부탁드립니다.\n\n(기존에 업로드한 예시 파일의 부드러운 어조와 서술형 안내 방식을 완벽하게 재연함)</pre>
+        <div className="border border-gray-700 bg-gray-800 rounded-lg p-4">
+          <h4 className="text-gray-300 font-bold mb-2">❌ Skill 미연결 상태의 일반 Claude</h4>
+          <pre className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">{`기안문 본문을 텍스트로 작성해 드립니다.
+복사해서 한글에 붙여넣고 서식을 직접 맞추세요...
+(hwpx 파일 직접 생성 불가)`}</pre>
         </div>
       </div>
     );
-    
     onExecute({
-      title: '에이전트 모델 비교 결과',
+      title: 'HWPX 공문 스킬 연결 결과',
       content: resultJSX,
-      point: '보고서 기획이나 아이데이션은 비용이 저렴하거나 구조화 능력이 좋은 AI(Gemini)가 유리하지만, 예전 공문 파일처럼 "형식과 말투"가 중요한 서류 작업은 문서 분석/모방 능력이 좋은 AI(Claude)를 에이전트로 쓰는 것이 더 효율적입니다.'
+      point: 'Skill을 한 번만 내 Claude 계정에 업로드해 두면, 이후에는 주제만 말해도 한글에서 바로 열리는 hwpx 파일이 자동 생성됩니다. 서식·어체·결재란까지 자동으로 맞춰주기 때문에 공문 작성 시간이 극적으로 줄어듭니다.'
     });
   };
 
   return (
-    <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-4 overflow-y-auto">
-      <div className="text-white font-bold mb-2">Claude Skill 에이전트 제작 및 도구 비교</div>
-      
-      <div className="relative bg-[#1c232b] p-3 rounded-lg border border-gray-700">
-        <div className="text-[10px] font-bold text-gray-400 mb-1">개선된 시스템 프롬프트 (Project/Skill 용)</div>
-        <CopyButton text={promptText} />
-        <pre className="text-xs text-canva-gray whitespace-pre-wrap font-mono mt-2">{promptText}</pre>
-        <button onClick={handleTest} className="w-full mt-2 py-2 bg-canva-purple/20 text-canva-purple rounded text-xs font-bold hover:bg-canva-purple/30">Google vs Claude 결과 차이 확인</button>
+    <div className="flex-1 bg-[#0e1318] rounded-xl p-0 border border-gray-800 flex flex-col overflow-hidden">
+      {/* Claude 시뮬레이션 헤더 */}
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1d24] border-b border-gray-800">
+        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-amber-600 flex items-center justify-center text-[10px] font-bold text-white">C</div>
+        <div className="text-xs text-gray-300 font-semibold">Claude.ai — Skill 업로드 시뮬레이터</div>
+        <div className="ml-auto flex gap-1">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500/70"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500/70"></div>
+        </div>
       </div>
 
-      <div className="mt-2">
-        <div className="text-xs text-gray-400 mb-3">도구 선택 체크리스트</div>
-        <div className="space-y-2 text-sm text-gray-300">
-          {[
-            {id:'google', label:'"Google 서비스를 주로 쓴다"'},
-            {id:'quality', label:'"한국어 문서 퀄리티가 제일 중요하다"'},
-            {id:'free', label:'"기본적으로 무료로 쓰고 싶다"'},
-            {id:'learn', label:'"기존 학교 문서를 업로드해 학습시키고 싶다"'}
-          ].map(opt => (
-            <div key={opt.id} 
-              className={`p-3 rounded-lg border cursor-pointer transition-colors flex flex-col justify-center ${selectedOpt === opt.id ? 'bg-canva-purple/10 border-canva-purple text-white' : 'bg-gray-800 border-gray-700 hover:border-gray-500'}`}
-              onClick={() => setSelectedOpt(opt.id)}
-            >
-              <div>{opt.label}</div>
-              {selectedOpt === opt.id && <div className="text-canva-teal font-bold text-xs mt-1">{getRecommendation(opt.id)}</div>}
+      <div className="flex flex-1 overflow-hidden">
+        {/* 좌측 사이드바 (Claude 스타일) */}
+        <div className="w-[180px] bg-[#141820] border-r border-gray-800 p-3 flex flex-col gap-1.5">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">메뉴</div>
+          <div className="text-xs text-gray-400 px-2 py-1.5 rounded hover:bg-gray-800/50">💬 새 대화</div>
+          <div className="text-xs text-gray-400 px-2 py-1.5 rounded hover:bg-gray-800/50">📁 Projects</div>
+          <button
+            onClick={() => step === 1 && setStep(2)}
+            className={`text-left text-xs px-2 py-1.5 rounded transition-all ${step >= 2 ? 'bg-canva-purple/20 text-canva-purple border border-canva-purple/40' : 'text-gray-300 hover:bg-gray-800/70 border border-transparent animate-pulse'}`}
+          >
+            {step >= 2 ? '✓' : '➕'} 커스터마이즈
+          </button>
+          <div className="text-xs text-gray-500 px-2 py-1.5">⚙️ 설정</div>
+          <div className="mt-auto text-[10px] text-gray-600 border-t border-gray-800 pt-2">
+            현재 단계: <span className="text-canva-teal font-bold">{Math.min(step, 5)}/5</span>
+          </div>
+        </div>
+
+        {/* 우측 메인 패널 */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Step 1: 시작 */}
+          {step === 1 && (
+            <div className="p-5 flex flex-col gap-4">
+              <div className="text-white font-bold text-sm">🎯 목표: HWPX 공문 스킬 연결하기</div>
+              <div className="bg-[#1c232b] border border-gray-700 rounded-lg p-4 text-xs text-gray-300 leading-relaxed">
+                이 스킬을 내 Claude에 올리면, 대화만으로 <span className="text-canva-teal font-bold">아래아한글(.hwpx) 공문·기안문 파일</span>이 자동으로 생성됩니다.
+                <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-amber-200">
+                  📎 스킬 출처: <a href="https://blog.naver.com/metagwc/224253033223" target="_blank" rel="noopener noreferrer" className="text-amber-300 underline hover:text-amber-100">HWPX 공문/기안문 자동 채우기 스킬 v2 (메타교육 블로그)</a>
+                </div>
+              </div>
+              <button onClick={() => setStep(2)} className="py-2.5 bg-canva-purple text-white rounded-lg text-sm font-bold hover:bg-opacity-90 transition-colors">
+                시작하기 → 좌측 [+ 커스터마이즈] 클릭
+              </button>
             </div>
-          ))}
+          )}
+
+          {/* Step 2: 커스터마이즈 탭 선택 */}
+          {step === 2 && (
+            <div className="p-5 flex flex-col gap-4">
+              <div className="text-white font-bold text-sm">Step 1/3 · 커스터마이즈 메뉴</div>
+              <div className="bg-[#1c232b] border border-gray-700 rounded-lg p-4">
+                <div className="flex gap-2 border-b border-gray-700 pb-2 mb-3">
+                  <div className="px-3 py-1.5 text-xs text-gray-500 border-b-2 border-transparent">프로필</div>
+                  <div className="px-3 py-1.5 text-xs text-gray-500 border-b-2 border-transparent">스타일</div>
+                  <button
+                    onClick={() => setStep(3)}
+                    className="px-3 py-1.5 text-xs text-canva-teal border-b-2 border-canva-teal font-bold animate-pulse"
+                  >
+                    스킬
+                  </button>
+                  <div className="px-3 py-1.5 text-xs text-gray-500 border-b-2 border-transparent">연동</div>
+                </div>
+                <div className="text-xs text-gray-400">
+                  👆 상단 탭에서 <span className="text-canva-teal font-bold">[스킬]</span> 탭을 클릭하세요.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: 스킬 업로드 버튼 */}
+          {step === 3 && (
+            <div className="p-5 flex flex-col gap-4">
+              <div className="text-white font-bold text-sm">Step 2/3 · 스킬 관리 페이지</div>
+              <div className="bg-[#1c232b] border border-gray-700 rounded-lg p-4">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="text-sm text-gray-200 font-semibold">내 스킬 (0개)</div>
+                  <button
+                    onClick={() => setStep(4)}
+                    className="px-3 py-1.5 bg-canva-purple text-white rounded text-xs font-bold hover:bg-opacity-90 animate-pulse"
+                  >
+                    + 스킬 업로드
+                  </button>
+                </div>
+                <div className="border border-dashed border-gray-700 rounded-lg p-6 text-center text-xs text-gray-500">
+                  아직 설치된 스킬이 없습니다
+                </div>
+              </div>
+              <div className="text-[11px] text-gray-500">
+                👆 우측 상단의 <span className="text-canva-purple font-bold">[+ 스킬 업로드]</span> 버튼을 클릭하세요.
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: 파일 업로드 */}
+          {step === 4 && (
+            <div className="p-5 flex flex-col gap-4">
+              <div className="text-white font-bold text-sm">Step 3/3 · 스킬 파일 업로드</div>
+              <div className="bg-[#1c232b] border border-gray-700 rounded-lg p-5">
+                <div className="text-sm text-gray-200 font-semibold mb-2">스킬 업로드</div>
+                <div className="text-[11px] text-gray-500 mb-4">
+                  .zip 파일을 선택하거나 여기로 드래그하세요
+                </div>
+                <div
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-all ${
+                    uploading ? 'border-canva-teal bg-canva-teal/5' : uploaded ? 'border-green-500 bg-green-500/5' : 'border-gray-600 hover:border-canva-purple bg-gray-900/40'
+                  }`}
+                >
+                  {!uploading && !uploaded && (
+                    <>
+                      <div className="text-3xl mb-2">📦</div>
+                      <div className="text-xs text-gray-300 font-semibold mb-1">HWPX 공문/기안문 자동 채우기 스킬 v2.zip</div>
+                      <div className="text-[10px] text-gray-500 mb-3">크기: 245 KB · 출처: 메타교육 블로그</div>
+                      <button
+                        onClick={handleUpload}
+                        className="px-4 py-2 bg-canva-purple text-white rounded text-xs font-bold hover:bg-opacity-90"
+                      >
+                        이 스킬 업로드
+                      </button>
+                    </>
+                  )}
+                  {uploading && (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-8 h-8 border-4 border-canva-teal border-t-transparent rounded-full animate-spin"></div>
+                      <div className="text-xs text-canva-teal font-bold">업로드 중...</div>
+                      <div className="text-[10px] text-gray-500">스킬 검증 · 매니페스트 파싱 · 권한 등록</div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 text-[10px] text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded p-2">
+                  ⚠️ 신뢰할 수 있는 출처의 스킬만 업로드하세요. <a href="https://blog.naver.com/metagwc/224253033223" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-200">출처 확인하기</a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: 업로드 완료 + 테스트 */}
+          {step === 5 && (
+            <div className="p-5 flex flex-col gap-4">
+              <div className="bg-green-500/10 border border-green-500/40 rounded-lg p-3 flex items-center gap-2">
+                <Check size={16} className="text-green-400" />
+                <div className="text-xs text-green-300 font-bold">스킬 설치 완료! 이제 대화창에서 바로 호출할 수 있습니다.</div>
+              </div>
+
+              <div className="bg-[#1c232b] border border-gray-700 rounded-lg p-3">
+                <div className="text-[10px] text-gray-500 mb-2">설치된 스킬 (1개)</div>
+                <div className="flex items-center gap-2 bg-gray-900/60 p-2 rounded border border-gray-700">
+                  <div className="text-lg">📄</div>
+                  <div className="flex-1">
+                    <div className="text-xs text-white font-semibold">HWPX 공문/기안문 자동 채우기 스킬 v2</div>
+                    <div className="text-[10px] text-gray-500">활성화됨 · 버전 2.0</div>
+                  </div>
+                  <div className="px-2 py-0.5 bg-green-500/20 text-green-400 text-[10px] rounded font-bold">ON</div>
+                </div>
+              </div>
+
+              {/* 대화 테스트 영역 */}
+              <div className="bg-[#0a0d12] border border-gray-700 rounded-lg p-3 flex flex-col gap-3">
+                <div className="text-[10px] text-gray-500">💬 Claude 대화창에서 테스트</div>
+
+                {chatSent && (
+                  <div className="flex justify-end">
+                    <div className="bg-canva-purple/20 border border-canva-purple/40 rounded-lg px-3 py-2 max-w-[85%] text-xs text-gray-200">
+                      {chatInput}
+                    </div>
+                  </div>
+                )}
+
+                {aiTyping && (
+                  <div className="flex gap-1 text-canva-teal text-xs">
+                    <span className="animate-bounce">●</span>
+                    <span className="animate-bounce" style={{animationDelay: '0.15s'}}>●</span>
+                    <span className="animate-bounce" style={{animationDelay: '0.3s'}}>●</span>
+                    <span className="ml-2 text-gray-500">Claude가 스킬을 불러오는 중...</span>
+                  </div>
+                )}
+
+                {showResponse && (
+                  <div className="bg-[#141820] border border-canva-teal/40 rounded-lg p-3 text-xs text-gray-200 leading-relaxed">
+                    <div className="text-[10px] text-canva-teal font-bold mb-2">🔧 [HWPX 공문/기안문 자동 채우기 스킬 v2] 실행됨</div>
+                    <div className="whitespace-pre-wrap">{`기안문을 작성했습니다.
+
+✓ 수신: 교장
+✓ 참조: 교감, 교무부장
+✓ 제목: 4학년 현장체험학습 실시 계획
+✓ 본문: 목적·일시·장소·예산·안전관리
+✓ 붙임: 참가 동의서, 안전교육 자료
+
+📎 생성 파일: 현장체험학습_기안문.hwpx
+ (한글 2020 이상에서 바로 열림)`}</div>
+                  </div>
+                )}
+
+                {!chatSent && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="예: 4학년 현장체험학습 기안문 작성해줘"
+                      className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs text-white placeholder-gray-600 focus:border-canva-purple focus:outline-none"
+                      onKeyDown={(e) => e.key === 'Enter' && handleChatSend()}
+                    />
+                    <button
+                      onClick={handleChatSend}
+                      disabled={!chatInput.trim()}
+                      className="px-3 py-2 bg-canva-purple text-white rounded text-xs font-bold hover:bg-opacity-90 disabled:opacity-30"
+                    >
+                      전송
+                    </button>
+                  </div>
+                )}
+
+                {!chatSent && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {['4학년 현장체험학습 기안문 작성해줘', '학부모 총회 개최 공문 써줘', '교육청 보고용 예산 집행 기안문'].map((suggest, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setChatInput(suggest)}
+                        className="text-[10px] px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded border border-gray-700"
+                      >
+                        {suggest}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {showResponse && (
+                <button
+                  onClick={handleComplete}
+                  className="py-2.5 bg-canva-teal text-white rounded-lg text-sm font-bold hover:bg-opacity-90 transition-colors"
+                >
+                  ✓ Skill 연결 전/후 차이 확인하기
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

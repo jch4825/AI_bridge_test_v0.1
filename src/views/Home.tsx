@@ -76,9 +76,8 @@ export default function Home({ onViewChange }: HomeProps) {
 
       {/* Content Section */}
       <main className="p-10 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <div className="mb-8">
           <h2 className="text-xl font-bold text-canva-ink">AI Bridge: Zero-Gap Toolkit</h2>
-          <button className="text-sm font-bold text-canva-purple hover:underline">모두 보기</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

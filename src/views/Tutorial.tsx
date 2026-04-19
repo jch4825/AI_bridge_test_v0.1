@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { GoogleGenAI } from "@google/genai";
 import { modules, lessons, Lesson } from '../data/tutorialData';
 import { Module } from '../types';
+import { friendlyApiError } from '../utils/apiError';
 import {
   Lesson41Interactive,
   Lesson42Interactive,
@@ -66,6 +67,10 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
   const [isTyping, setIsTyping] = useState(false);
   const [learningPoint, setLearningPoint] = useState('');
   const [showOverlay, setShowOverlay] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(() => {
+    const key = localStorage.getItem('gemini-api-key');
+    return !!(key && key.length > 10);
+  });
 
   // 현재 모듈의 레슨 순서에서 다음 레슨 계산 (l1-4 숏컷 제외)
   const nextLesson = (() => {
@@ -141,6 +146,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
       const apiKey = inputToUse.trim();
       if (apiKey.startsWith('AIza')) {
         localStorage.setItem('gemini-api-key', apiKey);
+        setHasApiKey(true);
       }
     }
 
@@ -172,7 +178,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
           fullText = response.text || "답변을 생성할 수 없습니다.";
         } catch (error: any) {
           console.error("Gemini API Error:", error);
-          fullText = `API 호출 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`;
+          fullText = friendlyApiError(error);
         }
       }
 
@@ -288,7 +294,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                   .filter(l => l.moduleId === lesson.moduleId)
                   .sort((a, b) => a.order - b.order);
                   
-                if (lesson.moduleId === 'm2' || lesson.moduleId === 'm3') {
+                if (lesson.moduleId === 'm2' || lesson.moduleId === 'm3' || lesson.moduleId === 'm5') {
                   const apiLesson = lessons.find(l => l.id === 'l1-4');
                   if (apiLesson) {
                     moduleLessons = [apiLesson, ...moduleLessons];
@@ -317,12 +323,28 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
           <div className="w-full pb-20" style={{ maxWidth: '40em' }}>
             <h2 className="text-3xl font-bold text-canva-ink mb-8 break-words">{lesson.title}</h2>
             <div className="markdown-container text-canva-ink leading-relaxed text-base">
-              <ReactMarkdown 
+              <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  a: ({ node, ...props }) => (
-                    <a {...props} target="_blank" rel="noopener noreferrer" />
-                  ),
+                  a: ({ node, href, children, ...props }) => {
+                    if (href && href.startsWith('#lesson:')) {
+                      const lessonId = href.replace('#lesson:', '');
+                      return (
+                        <a
+                          {...props}
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            onNavigateToLesson(lessonId);
+                          }}
+                          className="text-canva-purple font-semibold hover:underline cursor-pointer"
+                        >
+                          {children}
+                        </a>
+                      );
+                    }
+                    return <a {...props} href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
+                  },
                 }}
               >
                 {lesson.content.replace(/^[ \t]+/gm, '')}
@@ -365,8 +387,28 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
         <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
           {/* Main interactive area: full height for m4, otherwise top half */}
           <div className={`flex flex-col bg-[#0e1318] border-gray-800 min-h-0 ${lesson.moduleId === 'm4' ? 'flex-1' : 'lg:flex-[3] lg:border-b md:flex-1'}`}>
-            <div className="p-4 border-b border-gray-800 flex items-center justify-center shrink-0 hidden md:flex">
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between shrink-0 hidden md:flex">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">문제 입력</span>
+              {(lesson.id === 'l1-5' || lesson.id === 'l2-6' || lesson.id === 'l2-7' || (lesson.moduleId === 'm3' && lesson.id !== 'l3-1') || lesson.id === 'l5-5') && (
+                <div className="flex items-center gap-2">
+                  <div className={`text-[10px] px-2 py-1 rounded-full font-bold ${hasApiKey ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                    {hasApiKey ? '● API 연결됨' : '○ API 키 미등록'}
+                  </div>
+                  {hasApiKey && (
+                    <button
+                      onClick={() => {
+                        if (confirm('저장된 API 키를 삭제하시겠습니까?\n공용 PC에서는 사용 후 꼭 해제해 주세요.')) {
+                          localStorage.removeItem('gemini-api-key');
+                          setHasApiKey(false);
+                        }
+                      }}
+                      className="text-[10px] px-2 py-1 rounded-full font-bold border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors"
+                    >
+                      연결 끊기
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <div className={`flex-1 p-8 flex flex-col overflow-y-auto no-scrollbar`}>
               {lesson.interactive ? (
@@ -427,7 +469,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                       {lesson.id === 'l5-2' && <Lesson52Interactive />}
                       {lesson.id === 'l5-3' && <Lesson53Interactive />}
                       {lesson.id === 'l5-4' && <Lesson54Interactive />}
-                      {lesson.id === 'l5-5' && <Lesson55Interactive />}
+                      {lesson.id === 'l5-5' && <Lesson55Interactive onRun={handleRun} setUserInput={setUserInput} onNavigateToLesson={onNavigateToLesson} />}
                       {lesson.id === 'l5-6' && <Lesson56Interactive />}
                     </>
                   ) : lesson.id !== 'l2-1' && lesson.id !== 'l2-2' && lesson.id !== 'l2-3' && lesson.id !== 'l2-4' && lesson.id !== 'l2-5' && lesson.id !== 'l3-1' && (
@@ -489,7 +531,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                       <div className="w-2 h-2 bg-canva-teal rounded-full animate-pulse"></div>
                       <span className="text-[10px] font-bold text-canva-teal uppercase tracking-widest">AI Response</span>
                     </div>
-                    {(lesson.id === 'l2-6' || lesson.id === 'l2-7' || (lesson.moduleId === 'm3' && lesson.id !== 'l3-1')) && aiResponse && !isTyping && (
+                    {(lesson.id === 'l2-6' || lesson.id === 'l2-7' || (lesson.moduleId === 'm3' && lesson.id !== 'l3-1') || lesson.id === 'l4-1' || lesson.id === 'l4-2' || lesson.id === 'l5-5') && aiResponse && !isTyping && (
                       <button
                         onClick={async () => {
                           if (!localStorage.getItem('gemini-api-key')) {
@@ -540,7 +582,11 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                       </ReactMarkdown>
                     )}
                     {isTyping && <span className="inline-block w-2 h-4 bg-canva-teal ml-1 animate-pulse"></span>}
-                    {!aiResponse && !isTyping && <span className="text-gray-600 italic">실행 버튼이나 결과 보기 버튼을 눌러 AI의 답변을 확인하세요.</span>}
+                    {!aiResponse && !isTyping && (
+                      <span className="text-gray-400 italic">
+                        {lesson.interactive?.answer || '실행 버튼을 눌러 AI의 답변을 확인하세요.'}
+                      </span>
+                    )}
                   </div>
                 </div>
                 
@@ -679,11 +725,34 @@ interface TutorialProps {
 
 export default function Tutorial({ selectedModule, onSelectModule, completedLessons, onToggleComplete, onMarkComplete }: TutorialProps) {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+  // URL 파라미터에서 레슨 ID를 읽어서 초기화
+  useEffect(() => {
+    if (initialLoadDone) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const lessonId = params.get('lesson');
+
+    if (lessonId) {
+      const lesson = lessons.find(l => l.id === lessonId);
+      if (lesson) {
+        const module = modules.find(m => m.id === lesson.moduleId);
+        if (module) {
+          onSelectModule(module);
+          setCurrentLesson(lesson);
+        }
+      }
+    }
+
+    setInitialLoadDone(true);
+  }, [initialLoadDone, onSelectModule]);
 
   // 사이드바에서 모듈이 바뀌면 현재 레슨 초기화
   useEffect(() => {
+    if (!initialLoadDone) return;
     setCurrentLesson(null);
-  }, [selectedModule?.id]);
+  }, [selectedModule?.id, initialLoadDone]);
 
   const toggleComplete = onToggleComplete;
   const markComplete = onMarkComplete;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, FileText } from 'lucide-react';
 import { Lesson } from '../data/tutorialData';
 
 export const CopyButton = ({ text, className = "" }: { text: string, className?: string }) => {
@@ -17,6 +17,26 @@ export const CopyButton = ({ text, className = "" }: { text: string, className?:
       className={`p-1.5 bg-gray-700/50 hover:bg-gray-700 rounded-md text-gray-300 hover:text-white transition-colors flex items-center gap-1 text-xs ${className}`}
     >
       {copied ? <><Check size={14} /> 복사됨!</> : <><Copy size={14} /> 복사</>}
+    </button>
+  );
+};
+
+export const GoogleDocsButton = ({ text, className = "" }: { text: string, className?: string }) => {
+  const handleClick = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      window.open('https://docs.new', '_blank');
+    } catch (err) {
+      alert('클립보드 자동 복사에 실패했습니다. 수동으로 텍스트를 복사해주세요.');
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`text-xs text-white hover:bg-blue-600 transition-colors flex items-center gap-1 bg-blue-500 px-3 py-1.5 rounded-lg font-medium shadow-sm ${className}`}
+    >
+      <FileText size={14} /> 구글Docs에 ctrl+v 하세요.
     </button>
   );
 };
@@ -589,8 +609,45 @@ export const Lesson54Interactive = () => {
 };
 
 // 5-5: 학년별 활동
-export const Lesson55Interactive = () => {
+interface Lesson55Props {
+  onRun?: (input: string) => void;
+  setUserInput?: (input: string) => void;
+  onNavigateToLesson?: (id: string) => void;
+}
+
+export const Lesson55Interactive = ({ onRun, setUserInput, onNavigateToLesson }: Lesson55Props = {}) => {
   const [activeTab, setActiveTab] = useState<'lower' | 'middle' | 'upper'>('lower');
+  const [schoolLevel, setSchoolLevel] = useState('초등학교 중학년 (3~4학년)');
+  const [studentCount, setStudentCount] = useState('24');
+  const [studentTraits, setStudentTraits] = useState('');
+  const [ethicsFocus, setEthicsFocus] = useState('종합');
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
+
+  useEffect(() => {
+    const key = localStorage.getItem('gemini-api-key');
+    setHasApiKey(!!(key && key.length > 10));
+  }, []);
+
+  const handleGenerate = () => {
+    if (!onRun || !setUserInput) return;
+    const focusDetail = {
+      '종합': '모듈 5 전체 내용(할루시네이션, 편향, 프라이버시, 저작권)을 균형있게 포함',
+      '할루시네이션': 'AI가 거짓 정보를 생성하는 현상과 검증 방법 중심',
+      '편향': '알고리즘 편향의 사례와 다양성 확보 방법 중심',
+      '프라이버시': '개인정보 보호와 안전한 AI 사용 방법 중심',
+      '저작권': 'AI 생성물의 출처 표기와 학문적 정직성 중심'
+    };
+
+    const composed = `[학교급] ${schoolLevel}
+[학생 수] ${studentCount}명
+[학생 특성] ${studentTraits || '(특별한 기재 사항 없음 — 표준 학급으로 설계)'}
+[윤리 수업 포커스] ${ethicsFocus} — ${focusDetail[ethicsFocus as keyof typeof focusDetail]}
+
+위 정보를 바탕으로 우리 반에서 바로 사용할 수 있는 AI 윤리 수업 지도안 1차시를 작성해주세요.`;
+    setUserInput(composed);
+    onRun(composed);
+  };
 
   const activities = {
     lower: [
@@ -708,46 +765,162 @@ export const Lesson55Interactive = () => {
 
   return (
     <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-4 overflow-y-auto">
-      <div className="text-white font-bold mb-2">학년별 수업 활동</div>
-
-      <div className="sticky top-0 z-10 bg-[#0e1318] py-3 -mx-5 px-5 border-b border-gray-700">
-        <div className="flex gap-2 overflow-x-auto">
-        {tabConfig.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-3 py-2 rounded-lg whitespace-nowrap text-sm transition-colors ${
-              activeTab === tab.id
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            {tab.emoji} {tab.label}
-          </button>
-        ))}
+      {/* AI 지도안 생성 폼 */}
+      <div className="bg-gradient-to-br from-purple-900/30 to-gray-900 border border-canva-purple/40 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-white font-bold flex items-center gap-2">
+            <span className="text-lg">🎓</span> AI 윤리 수업 지도안 생성기
+          </div>
         </div>
+
+        <div className="text-[11px] text-gray-400 mb-3 leading-relaxed">
+          우리 반 정보를 입력하면 Gemini AI가 바로 사용할 수 있는 <span className="text-canva-teal font-bold">맞춤 수업 지도안</span>을 작성합니다.
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-bold text-gray-300 mb-1.5">학교급 / 학년</label>
+            <select
+              value={schoolLevel}
+              onChange={(e) => setSchoolLevel(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-canva-purple"
+            >
+              <option>초등학교 저학년 (1~2학년)</option>
+              <option>초등학교 중학년 (3~4학년)</option>
+              <option>초등학교 고학년 (5~6학년)</option>
+              <option>중학교 1학년</option>
+              <option>중학교 2학년</option>
+              <option>중학교 3학년</option>
+              <option>고등학교 1학년</option>
+              <option>고등학교 2학년</option>
+              <option>고등학교 3학년</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-300 mb-1.5">학생 수</label>
+            <input
+              type="number"
+              value={studentCount}
+              onChange={(e) => setStudentCount(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-canva-purple"
+              placeholder="예: 24"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-300 mb-1.5">학생 특성 (자유 기재)</label>
+            <textarea
+              value={studentTraits}
+              onChange={(e) => setStudentTraits(e.target.value)}
+              rows={2}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-canva-purple resize-none"
+              placeholder={'예: 디지털 기기 사용 익숙, 비판적 분석 경험 적음, 다문화 학생 3명'}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-300 mb-1.5">윤리 수업 주제 및 포커스</label>
+            <select
+              value={ethicsFocus}
+              onChange={(e) => setEthicsFocus(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-canva-purple"
+            >
+              <option>종합</option>
+              <option>할루시네이션</option>
+              <option>편향</option>
+              <option>프라이버시</option>
+              <option>저작권</option>
+            </select>
+            <div className="mt-1 text-[10px] text-gray-500">
+              {ethicsFocus === '종합' && '모듈 5 전체 내용을 균형있게 다룹니다.'}
+              {ethicsFocus === '할루시네이션' && 'AI의 거짓 정보 생성과 검증 방법에 중점을 둡니다.'}
+              {ethicsFocus === '편향' && '알고리즘 편향의 사례와 개선 방법에 중점을 둡니다.'}
+              {ethicsFocus === '프라이버시' && '개인정보 보호와 안전한 AI 사용에 중점을 둡니다.'}
+              {ethicsFocus === '저작권' && 'AI 생성물의 출처 표기와 학문적 정직성에 중점을 둡니다.'}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-4">
+          {!hasApiKey && onNavigateToLesson && (
+            <button
+              onClick={() => onNavigateToLesson('l1-4')}
+              className="px-4 py-2.5 bg-canva-purple text-white rounded-lg font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg"
+            >
+              API 키 입력
+            </button>
+          )}
+          <button
+            onClick={handleGenerate}
+            disabled={!onRun}
+            className="flex-1 px-5 py-2.5 bg-canva-teal text-white rounded-lg font-bold text-sm hover:bg-opacity-90 transition-all disabled:opacity-40 shadow-lg shadow-teal-900/20"
+          >
+            ✨ AI 지도안 생성 (Run)
+          </button>
+        </div>
+
+        {!hasApiKey && (
+          <div className="mt-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded text-[10px] text-amber-200 leading-relaxed">
+            💡 API 키가 없어도 괜찮습니다. 아래 <span className="font-bold">&quot;기본 수업 활동 모음&quot;</span>에서 저·중·고학년별로 준비된 9가지 활동을 바로 구글 Docs로 내보내 수업에 쓸 수 있습니다.
+          </div>
+        )}
       </div>
 
-      <div className="space-y-4 pt-3">
-        {activities[activeTab].map((activity, idx) => (
-          <div key={idx} className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-            <div className="font-bold text-white mb-2">{activity.title}</div>
-            <div className="text-xs text-gray-400 mb-3">⏱️ {activity.time} | 목표: {activity.goal}</div>
-            <div className="space-y-2 text-sm text-gray-300">
-              {activity.steps.map((step, stepIdx) => (
-                <div key={stepIdx} className="flex gap-2">
-                  <span className="text-gray-500 flex-shrink-0">{stepIdx + 1}.</span>
-                  <span>{step}</span>
+      {/* Fallback: 기존 9개 시나리오 활동 */}
+      <div className="mt-2">
+        <button
+          onClick={() => setShowFallback(!showFallback)}
+          className="w-full flex items-center justify-between bg-gray-900 hover:bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-left transition-colors"
+        >
+          <div>
+            <div className="text-white font-bold text-sm">📚 기본 수업 활동 모음 (API 없이 즉시 사용)</div>
+            <div className="text-[10px] text-gray-400 mt-0.5">저·중·고학년별로 준비된 9가지 검증 활동 · 구글 Docs 바로 내보내기 가능</div>
+          </div>
+          <span className={`text-gray-400 transition-transform ${showFallback ? 'rotate-180' : ''}`}>▼</span>
+        </button>
+
+        {showFallback && (
+          <div className="mt-3">
+            <div className="flex gap-2 overflow-x-auto mb-3">
+              {tabConfig.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-2 rounded-lg whitespace-nowrap text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  {tab.emoji} {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-4">
+              {activities[activeTab].map((activity, idx) => (
+                <div key={idx} className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+                  <div className="font-bold text-white mb-2">{activity.title}</div>
+                  <div className="text-xs text-gray-400 mb-3">⏱️ {activity.time} | 목표: {activity.goal}</div>
+                  <div className="space-y-2 text-sm text-gray-300">
+                    {activity.steps.map((step, stepIdx) => (
+                      <div key={stepIdx} className="flex gap-2">
+                        <span className="text-gray-500 flex-shrink-0">{stepIdx + 1}.</span>
+                        <span>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <GoogleDocsButton
+                      text={`${activity.title} (${activity.time})\n목표: ${activity.goal}\n\n진행 방법:\n${activity.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="mt-3 flex justify-end">
-              <CopyButton
-                text={`${activity.title} (${activity.time})\n목표: ${activity.goal}\n\n진행 방법:\n${activity.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`}
-              />
-            </div>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
@@ -918,7 +1091,7 @@ ${customInputs.copyright ? `\n추가: ${customInputs.copyright}` : ''}
             {generated}
           </pre>
           <div className="flex gap-2">
-            <CopyButton text={generated} className="flex-1 justify-center" />
+            <GoogleDocsButton text={generated} className="flex-1 justify-center" />
             <button
               onClick={() => setGenerated('')}
               className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-2 px-3 text-sm font-medium transition-colors"
