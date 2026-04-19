@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
+import TopNav from './components/TopNav';
 import Home from './views/Home';
 import Tutorial from './views/Tutorial';
+import QuickTools from './views/QuickTools';
 import { ViewType, Module } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<ViewType>('home');
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has('lesson') ? 'tutorial' : 'home';
+  });
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const [completedLessons, setCompletedLessons] = useState<string[]>(() => {
     try {
@@ -53,12 +58,7 @@ export default function App() {
           </div>
         );
       case 'tools':
-        return (
-          <div className="p-12 text-center">
-            <h2 className="text-3xl font-bold mb-4">Quick Tools</h2>
-            <p className="text-gray-500">준비 중인 페이지입니다.</p>
-          </div>
-        );
+        return <QuickTools />;
       case 'tutorial':
         return <Tutorial
           selectedModule={selectedModule}
@@ -71,6 +71,25 @@ export default function App() {
         return <Home onViewChange={setCurrentView} />;
     }
   };
+
+  if (currentView === 'tools') {
+    return (
+      <div className="min-h-screen bg-canva-bg font-sans text-canva-ink">
+        <TopNav currentView={currentView} onViewChange={handleViewChange} />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key="tools"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <QuickTools />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-canva-bg font-sans text-canva-ink">
