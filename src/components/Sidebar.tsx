@@ -35,14 +35,14 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
         />
       )}
       <aside className={`w-64 h-screen bg-white border-r border-canva-border flex flex-col fixed left-0 top-0 z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="p-8 pb-4">
+        <div className="p-8 pb-4 shrink-0">
         <h1 className="text-xl font-extrabold text-canva-teal tracking-tighter leading-tight">
           AI Bridge:<br/>Zero-Gap Toolkit
         </h1>
       </div>
 
-      <nav className="flex-1 px-4 flex flex-col overflow-hidden">
-        <div className="space-y-2">
+      <nav className="flex-1 min-h-0 px-4 flex flex-col overflow-y-auto webkit-scrollbar-hide">
+        <div className="space-y-2 shrink-0">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -67,7 +67,7 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
         </div>
 
         {currentView === 'tutorial' && (
-          <div className="mt-4 border-t border-canva-border pt-4 flex-1 overflow-y-auto">
+          <div className="mt-4 border-t border-canva-border pt-4 shrink-0">
             <p className="text-[10px] font-bold text-canva-gray uppercase tracking-wider px-2 mb-2">모듈 이동</p>
             <div className="space-y-1">
               {modules.map((mod) => (
@@ -96,7 +96,7 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
         )}
       </nav>
 
-      <div className="p-6 mt-auto border-t border-canva-border flex flex-col gap-4">
+      <div className="p-6 mt-auto border-t border-canva-border flex flex-col gap-4 shrink-0">
         <div className="bg-canva-bg rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold text-canva-gray uppercase tracking-wider">학습 진도</span>
