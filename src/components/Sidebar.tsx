@@ -10,9 +10,11 @@ interface SidebarProps {
   selectedModule: Module | null;
   onSelectModule: (module: Module | null) => void;
   completedLessons: string[];
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ currentView, onViewChange, selectedModule, onSelectModule, completedLessons }: SidebarProps) {
+export default function Sidebar({ currentView, onViewChange, selectedModule, onSelectModule, completedLessons, isOpen, onClose }: SidebarProps) {
   const totalLessons = lessons.length;
   const completedCount = completedLessons.filter(id => lessons.some(l => l.id === id)).length;
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
@@ -24,8 +26,16 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
   ] as const;
 
   return (
-    <aside className="w-64 h-screen bg-white border-r border-canva-border flex flex-col fixed left-0 top-0 z-50">
-      <div className="p-8">
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity" 
+          onClick={onClose}
+        />
+      )}
+      <aside className={`w-64 h-screen bg-white border-r border-canva-border flex flex-col fixed left-0 top-0 z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="p-8 pb-4">
         <h1 className="text-xl font-extrabold text-canva-teal tracking-tighter leading-tight">
           AI Bridge:<br/>Zero-Gap Toolkit
         </h1>
@@ -39,7 +49,10 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
             return (
               <button
                 key={item.id}
-                onClick={() => onViewChange(item.id)}
+                onClick={() => {
+                  onViewChange(item.id);
+                  onClose?.();
+                }}
                 className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   isActive
                     ? 'bg-canva-bg text-canva-purple'
@@ -60,7 +73,10 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
               {modules.map((mod) => (
                 <button
                   key={mod.id}
-                  onClick={() => onSelectModule(selectedModule?.id === mod.id ? null : mod)}
+                  onClick={() => {
+                    onSelectModule(selectedModule?.id === mod.id ? null : mod);
+                    onClose?.();
+                  }}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all duration-200 text-left ${
                     selectedModule?.id === mod.id
                       ? 'bg-canva-purple/10 text-canva-purple font-bold'
@@ -94,6 +110,7 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
           이 프로그램은 Claude Code와 Google AI Studio로 제작되었습니다.
         </p>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
