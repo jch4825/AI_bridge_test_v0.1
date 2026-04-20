@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, PlayCircle, Clock, ArrowRight, Copy, Info, FileText, Lock, Check, School } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -71,6 +71,9 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
     const key = localStorage.getItem('gemini-api-key');
     return !!(key && key.length > 10);
   });
+  const [metaPromptCopied, setMetaPromptCopied] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const runIdRef = useRef(0);
 
   // 현재 모듈의 레슨 순서에서 다음 레슨 계산 (l1-4 숏컷 제외)
   const nextLesson = (() => {
@@ -104,40 +107,75 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
   };
 
   useEffect(() => {
+    // Cancel any in-progress typing animation before switching lessons
+    runIdRef.current++;
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     const points = LEARNING_POINTS[lesson.id] || LEARNING_POINTS['default'];
     const randomPoint = points[Math.floor(Math.random() * points.length)];
     setLearningPoint(randomPoint);
-    
+
     // Reset state when navigating to a different lesson
     setUserInput(lesson.interactive?.initialInput || '');
     setAiResponse('');
     setIsTyping(false);
   }, [lesson.id, lesson.interactive?.initialInput]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      runIdRef.current++;
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
+
   const handleRun = async (forcedInput?: string) => {
     if (!lesson.interactive) return;
     const inputToUse = forcedInput !== undefined ? forcedInput : userInput;
-    
+
+    // Cancel any previous typing animation
+    runIdRef.current++;
+    const myRunId = runIdRef.current;
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     setIsTyping(true);
     setAiResponse('');
 
-    if (inputToUse.trim() === '') {
-      const emptyMsg = '입력창에 내용을 작성해 주세요.';
+    // Helper: starts a character-by-character typing animation.
+    // Cancels itself if a newer run has started (runIdRef > myRunId).
+    const startTyping = (text: string, speed = 15) => {
       let i = 0;
-      const interval = setInterval(() => {
-        if (i < emptyMsg.length) {
-          const char = emptyMsg.charAt(i);
-          if (char !== '') {
-            setAiResponse(prev => prev + char);
-          }
+      intervalRef.current = setInterval(() => {
+        // Stale-run guard: stop if a newer handleRun or lesson change occurred
+        if (myRunId !== runIdRef.current) {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
+          return;
+        }
+        if (i < text.length) {
+          const char = text.charAt(i);
+          if (char) setAiResponse(prev => prev + char);
           i++;
         }
-        
-        if (i >= emptyMsg.length) {
-          clearInterval(interval);
+        if (i >= text.length) {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
           setIsTyping(false);
         }
-      }, 15);
+      }, speed);
+    };
+
+    if (inputToUse.trim() === '') {
+      startTyping('입력창에 내용을 작성해 주세요.');
       return;
     }
 
@@ -160,47 +198,44 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
       } else {
         try {
           const ai = new GoogleGenAI({ apiKey: savedKey });
-          let promptWithConstraint = inputToUse;
+          // 모든 AI 답변에 공통 적용되는 가독성 포맷 규칙
+          const FORMAT_RULE = "\n\n[형식 규칙] 가독성을 위해 ① 글자 색깔 변경(HTML 태그·인라인 스타일 포함)은 절대 사용하지 않습니다. ② 표(마크다운 테이블 포함)는 만들지 않습니다.";
+
           let systemInstruction = "";
-          
+
           if (lesson.interactive.systemPrompt) {
-            systemInstruction = lesson.interactive.systemPrompt;
+            systemInstruction = lesson.interactive.systemPrompt + FORMAT_RULE;
           } else if (lesson.id === 'l1-5') {
-            systemInstruction = "답변은 반드시 5줄 이내로 간결하게 작성해주세요.";
+            systemInstruction = "답변은 반드시 5줄 이내로 간결하게 작성해주세요." + FORMAT_RULE;
           }
-          
+
           const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
-            contents: promptWithConstraint,
+            contents: inputToUse,
             config: systemInstruction ? { systemInstruction } : undefined
           });
-          
+
           fullText = response.text || "답변을 생성할 수 없습니다.";
+
+          // Save l2-6 meta-prompt output so l3-8 can reuse it
+          if (lesson.id === 'l2-6' && response.text) {
+            try {
+              localStorage.setItem('meta-prompt-l2-6', response.text);
+            } catch {}
+          }
         } catch (error: any) {
           console.error("Gemini API Error:", error);
           fullText = friendlyApiError(error);
         }
       }
 
-      // Simulate typing effect for Gemini response
-      let i = 0;
-      const interval = setInterval(() => {
-        if (i < fullText.length) {
-          const char = fullText[i];
-          if (char !== undefined) {
-            setAiResponse(prev => prev + char);
-          }
-          i++;
-        }
-        
-        if (i >= fullText.length) {
-          clearInterval(interval);
-          setIsTyping(false);
-        }
-      }, 10);
+      // Guard: if lesson changed while awaiting the API response, abort
+      if (myRunId !== runIdRef.current) return;
+
+      startTyping(fullText, 10);
       return;
     }
-    
+
     // Determine the answer based on user input for dynamic lessons
     let fullText = lesson.interactive.answer;
     if (lesson.interactive.answers) {
@@ -218,22 +253,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
       }
     }
 
-    // Simulate typing effect
-    let i = 0;
-    const interval = setInterval(() => {
-      if (i < fullText.length) {
-        const char = fullText[i];
-        if (char !== undefined) {
-          setAiResponse(prev => prev + char);
-        }
-        i++;
-      }
-      
-      if (i >= fullText.length) {
-        clearInterval(interval);
-        setIsTyping(false);
-      }
-    }, 15);
+    startTyping(fullText);
   };
 
   return (
@@ -422,11 +442,12 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                             {['ChatGPT', 'Gemini', 'Claude'].map(model => (
                               <button
                                 key={model}
+                                disabled={isTyping}
                                 onClick={() => {
                                   setUserInput(model);
                                   handleRun(model);
                                 }}
-                                className="px-4 py-2 bg-[#0e1318] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all"
+                                className="px-4 py-2 bg-[#0e1318] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 {model}
                               </button>
@@ -437,11 +458,12 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                             {lesson.interactive.predefinedInputs.map((input, idx) => (
                               <button
                                 key={idx}
+                                disabled={isTyping}
                                 onClick={() => {
                                   setUserInput(input);
                                   handleRun(input);
                                 }}
-                                className="text-left px-4 py-3 bg-[#0e1318] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all text-xs leading-relaxed"
+                                className="text-left px-4 py-3 bg-[#0e1318] hover:bg-canva-teal/20 border border-gray-700 rounded-lg text-canva-teal font-bold transition-all text-xs leading-relaxed disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 {input}
                               </button>
@@ -480,7 +502,25 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                         className="w-full h-full bg-transparent text-white font-mono text-sm outline-none resize-none"
                         placeholder={lesson.id === 'l1-5' ? "아무런 질문이나 작성해 보세요..." : "여기에 질문을 입력하거나 위 문장을 따라 써보세요..."}
                       />
-                      <div className="absolute bottom-5 right-5 flex gap-3">
+                      <div className="absolute bottom-5 right-5 flex gap-3 flex-wrap justify-end">
+                        {lesson.id === 'l3-8' && localStorage.getItem('meta-prompt-l2-6') && (
+                          <button
+                            onClick={async () => {
+                              const saved = localStorage.getItem('meta-prompt-l2-6') || '';
+                              try {
+                                await navigator.clipboard.writeText(saved);
+                                setMetaPromptCopied(true);
+                                setTimeout(() => setMetaPromptCopied(false), 2500);
+                              } catch {
+                                alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.');
+                              }
+                            }}
+                            className="px-4 py-3 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all shadow-lg"
+                            title="2-6에서 생성한 메타 프롬프트를 클립보드에 복사합니다. Gems의 요청 사항 칸에 붙여넣으세요."
+                          >
+                            {metaPromptCopied ? '✓ 복사됨! Gems 요청 사항에 붙여넣기' : '2-6 메타 프롬프트 복사'}
+                          </button>
+                        )}
                         {(lesson.id === 'l2-6' || lesson.id === 'l2-7' || lesson.moduleId === 'm3') && (
                           <button
                             onClick={() => onNavigateToLesson('l1-4')}

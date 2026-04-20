@@ -627,19 +627,19 @@ export const Lesson46Interactive = ({ onExecute }: { onExecute: (data: {title: s
   const resultText = `=== ○○초등학교 4학년 2반 AI 행정 도구함 ===
 작성: 홍길동 / 2024년 3월
 
-[1] 학교 시스템 프롬프트 (컨텍스트)
+[1] 학교 시스템 프롬프트
 당신은 ○○초등학교 도우미입니다... (4-1 내용)
 
-[2] 가정통신문 하네스
+[2] 가정통신문 프롬프트 템플릿
 형식: [학교명]+[날짜]+[제목]... (4-2 내용)
 
-[3] 공문 회신 하네스
+[3] 공문 회신 프롬프트 템플릿
 어조: 행정 어체 준수... (4-2 내용)
 
 [사용 방법]
 1. 새 AI 대화 창 열기
 2. [1] 학교 시스템 프롬프트 붙여넣기
-3. 해당 업무의 하네스 붙여넣기
+3. 해당 업무의 프롬프트 템플릿 붙여넣기
 4. 업무 주제만 입력
 5. 결과 검토 후 사용
 
@@ -660,9 +660,9 @@ export const Lesson46Interactive = ({ onExecute }: { onExecute: (data: {title: s
       <div className="bg-gray-800/50 p-4 rounded-lg">
         <div className="text-sm text-gray-300 mb-2">1단계: 연간 루틴 구상 (예시)</div>
         <ul className="text-xs text-gray-400 space-y-1 ml-4 list-disc">
-          <li>3월: 학년 기본 컨텍스트(4-1) 세팅 완료</li>
-          <li>4월: 체험학습용 가정통신문 하네스(4-2) 적극 활용</li>
-          <li>6월: 통지표 작성 시 보조 에이전트(4-3) 활용</li>
+          <li>3월: 학교 시스템 프롬프트(4-1) 세팅 완료</li>
+          <li>4월: 체험학습용 가정통신문 프롬프트 템플릿(4-2) 적극 활용</li>
+          <li>6월: 통지표 작성 시 나만의 AI 앱(4-3) 활용</li>
           <li>연중: 교육청 공문은 Claude MCP(4-5)로 웹 핑거프린트 확인</li>
         </ul>
       </div>
