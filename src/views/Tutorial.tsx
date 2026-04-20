@@ -7,6 +7,7 @@ import { GoogleGenAI } from "@google/genai";
 import { modules, lessons, Lesson } from '../data/tutorialData';
 import { Module } from '../types';
 import { friendlyApiError } from '../utils/apiError';
+import SpeakButton from '../components/SpeakButton';
 import {
   Lesson41Interactive,
   Lesson42Interactive,
@@ -261,8 +262,14 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
       {showOverlay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 overflow-y-auto" style={{ minHeight: '100vh' }}>
           <div className="bg-white rounded-xl max-w-[480px] w-full p-8 shadow-2xl relative">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">모듈 4를 시작하기 전에</h3>
-            
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900 text-center flex-1">모듈 4를 시작하기 전에</h3>
+              <SpeakButton
+                text="모듈 4를 시작하기 전에. 첫째, 개인정보는 AI에 넣지 않습니다. 학생 이름, 주민번호, 연락처, 교사 인사 정보는 절대 AI에 입력하지 않고, 가명 혹은 익명화하여 사용합니다. 둘째, AI 결과물은 반드시 교사가 검토합니다. 공문, 가정통신문 등은 법적 효력이 발생할 수 있습니다. AI는 어디까지나 초안을 제시할 뿐 최종 책임은 작성자 본인에게 있습니다. 셋째, 학교 공식 시스템 연동은 승인이 필요합니다. 나이스나 업무관리시스템 등 학교 자체 공식망에 AI를 직접 연결하는 행위는 교육청 승인 없이 개인이 임의로 해선 안 됩니다."
+                label="원칙 전체 듣기"
+              />
+            </div>
+
             <div className="space-y-4">
               <div className="flex gap-4 items-start p-4 border-b border-gray-100">
                 <div className="text-2xl mt-1">🔒</div>
@@ -341,7 +348,10 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
         </div>
         <div className="flex-1 overflow-y-auto p-10 min-w-0 bg-white relative">
           <div className="w-full pb-20" style={{ maxWidth: '40em' }}>
-            <h2 className="text-3xl font-bold text-canva-ink mb-8 break-words">{lesson.title}</h2>
+            <div className="flex items-start justify-between gap-4 mb-8">
+              <h2 className="text-3xl font-bold text-canva-ink break-words flex-1">{lesson.title}</h2>
+              <SpeakButton text={`${lesson.title}. ${lesson.content}`} label="레슨 본문 듣기" />
+            </div>
             <div className="markdown-container text-canva-ink leading-relaxed text-base">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -372,11 +382,14 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
             </div>
             {lesson.tip && (
               <div className="mt-10 p-5 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="bg-amber-100 p-1.5 rounded-md">
-                    <Info size={16} className="text-amber-600" />
+                <div className="flex items-center gap-2 mb-3 justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-amber-100 p-1.5 rounded-md">
+                      <Info size={16} className="text-amber-600" />
+                    </div>
+                    <span className="text-sm font-bold text-amber-700">현명하게 활용하기</span>
                   </div>
-                  <span className="text-sm font-bold text-amber-700">현명하게 활용하기</span>
+                  <SpeakButton text={lesson.tip} label="팁 듣기" />
                 </div>
                 <p className="text-[13px] text-gray-800 leading-relaxed font-medium">
                   {lesson.tip}
@@ -392,10 +405,11 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                 <div className="bg-canva-purple/10 text-canva-purple p-2 rounded-lg flex-shrink-0">
                   <Info size={18} />
                 </div>
-                <div>
+                <div className="flex-1">
                   <h4 className="text-sm font-bold text-canva-ink mb-1">기법 연결: {lesson.technique.label}</h4>
                   <p className="text-xs text-canva-gray leading-relaxed">{lesson.technique.description}</p>
                 </div>
+                <SpeakButton text={`기법 연결 ${lesson.technique.label}. ${lesson.technique.description}`} label="기법 설명 듣기" />
               </div>
             </div>
           )}
@@ -636,7 +650,10 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                     animate={{ opacity: 1, y: 0 }}
                     className="mt-8 p-6 bg-canva-purple/10 border border-canva-purple/20 rounded-xl"
                   >
-                    <h5 className="text-canva-purple font-bold text-xs mb-3 uppercase tracking-wider">학습 포인트</h5>
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="text-canva-purple font-bold text-xs uppercase tracking-wider">학습 포인트</h5>
+                      <SpeakButton text={learningPoint} label="학습 포인트 듣기" />
+                    </div>
                     <div className="text-sm text-white leading-relaxed markdown-container">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
@@ -733,8 +750,11 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
               
               <div className="mt-8 bg-canva-purple/10 border border-canva-purple/20 p-5 rounded-xl flex gap-4 items-start">
                 <div className="text-xl mt-1">💡</div>
-                <div>
-                  <h4 className="text-canva-purple font-bold text-sm mb-1">학습 포인트</h4>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-canva-purple font-bold text-sm">학습 포인트</h4>
+                    <SpeakButton text={m4PopupData.point} label="학습 포인트 듣기" />
+                  </div>
                   <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{m4PopupData.point}</p>
                 </div>
               </div>
@@ -830,6 +850,13 @@ export default function Tutorial({ selectedModule, onSelectModule, completedLess
                   {module.title}
                 </h3>
                 <p className="text-sm text-canva-gray mt-1">{module.description}</p>
+                <div className="mt-2" onClick={e => e.stopPropagation()}>
+                  <SpeakButton
+                    text={`${module.title}. ${module.description}`}
+                    label="모듈 설명 듣기"
+                    stopPropagation
+                  />
+                </div>
                 <div className="flex items-center gap-4 mt-3">
                   <span className="text-[11px] font-bold text-canva-gray uppercase flex items-center gap-1">
                     <BookOpen size={12} /> {module.lessonsCount} 레슨
@@ -868,7 +895,8 @@ export default function Tutorial({ selectedModule, onSelectModule, completedLess
         <header className="mb-12">
           <span className="text-xs font-bold text-canva-purple uppercase tracking-widest mb-2 block">모듈 {module.order}</span>
           <h1 className="text-3xl font-bold text-canva-ink mb-4">{module.title}</h1>
-          <p className="text-canva-gray">{module.description}</p>
+          <p className="text-canva-gray mb-3">{module.description}</p>
+          <SpeakButton text={`${module.title}. ${module.description}`} label="모듈 설명 듣기" />
         </header>
 
         <div className="space-y-4">

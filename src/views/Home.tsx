@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, BookOpen, Wrench, GraduationCap, PlayCircle, Clock, CheckCircle } from 'lucide-react';
 import { ViewType } from '../types';
+import SpeakButton from '../components/SpeakButton';
 
 interface HomeProps {
   onViewChange: (view: ViewType) => void;
@@ -10,12 +11,12 @@ interface HomeProps {
 export default function Home({ onViewChange }: HomeProps) {
   const parts = [
     {
-      id: 'resources',
-      title: '자료실',
-      subtitle: '리소스 허브',
-      description: 'AI 디지털 교재, 심의 서류 등 실무 자료를 즉시 활용하세요.',
-      icon: BookOpen,
-      iconBg: 'bg-[#ffe8e8]',
+      id: 'tutorial',
+      title: '튜토리얼',
+      subtitle: '핵심 학습 경로',
+      description: 'LLM 이해부터 윤리 점검까지, 초등교사를 위한 체계적인 로드맵입니다.',
+      icon: GraduationCap,
+      iconBg: 'bg-canva-purple/10',
     },
     {
       id: 'tools',
@@ -23,22 +24,22 @@ export default function Home({ onViewChange }: HomeProps) {
       subtitle: '즉시 활용 도구',
       description: '생기부 초안, 수업안 생성 등 지금 당장 쓸 수 있는 AI 도구 모음입니다.',
       icon: Wrench,
-      iconBg: 'bg-[#e8f0fe]',
+      iconBg: 'bg-canva-teal/10',
     },
     {
-      id: 'tutorial',
-      title: '튜토리얼',
-      subtitle: '핵심 학습 경로',
-      description: 'LLM 이해부터 윤리 점검까지, 초등교사를 위한 체계적인 로드맵입니다.',
-      icon: GraduationCap,
-      iconBg: 'bg-[#f3e8fd]',
+      id: 'resources',
+      title: '자료실',
+      subtitle: '리소스 허브',
+      description: 'AI 디지털 교재, 심의 서류 등 실무 자료를 즉시 활용하세요.',
+      icon: BookOpen,
+      iconBg: 'bg-canva-border',
     },
   ] as const;
 
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-orange-400 via-orange-500 to-red-500 py-20 px-10 text-center text-white">
+      <section className="bg-gradient-to-br from-canva-purple to-canva-teal py-20 px-10 text-center text-white">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -48,10 +49,12 @@ export default function Home({ onViewChange }: HomeProps) {
             무엇을 배우고 싶으신가요?
           </h1>
           
-          <div className="max-w-2xl mx-auto mb-12 relative">
-            <div className="bg-white rounded-lg h-14 flex items-center px-6 shadow-xl">
-              <span className="text-canva-ink text-sm font-medium">콘텐츠 또는 템플릿 검색</span>
-            </div>
+          <div className="max-w-2xl mx-auto mb-12 relative w-full">
+            <input 
+              type="text" 
+              placeholder="콘텐츠 또는 템플릿 검색..." 
+              className="w-full bg-white rounded-lg h-14 px-6 shadow-xl text-canva-ink placeholder-canva-gray outline-none focus:ring-2 focus:ring-canva-teal transition-all" 
+            />
           </div>
 
           <div className="flex justify-center gap-10">
@@ -97,7 +100,14 @@ export default function Home({ onViewChange }: HomeProps) {
                 </div>
                 <div className="p-6">
                   <h3 className="text-base font-bold mb-2 text-canva-ink">{part.title}</h3>
-                  <p className="text-sm text-canva-ink leading-relaxed">{part.description}</p>
+                  <p className="text-sm text-canva-ink leading-relaxed mb-3">{part.description}</p>
+                  <div onClick={e => e.stopPropagation()}>
+                    <SpeakButton
+                      text={`${part.title}. ${part.description}`}
+                      label="설명 듣기"
+                      stopPropagation
+                    />
+                  </div>
                 </div>
               </motion.div>
             );

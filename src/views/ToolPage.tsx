@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { GoogleGenAI } from '@google/genai';
 import { ToolDefinition } from '../tools/ToolRegistry';
 import { friendlyApiError } from '../utils/apiError';
+import SpeakButton from '../components/SpeakButton';
 
 interface ToolPageProps {
   tool: ToolDefinition;
@@ -101,10 +102,11 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
         <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${tool.gradient} flex items-center justify-center shrink-0`}>
           <Icon size={24} className="text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-900">{tool.title}</h1>
           <p className="text-sm text-gray-500">{tool.description}</p>
         </div>
+        <SpeakButton text={`${tool.title}. ${tool.description}`} label="도구 설명 듣기" />
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 text-xs text-amber-700 space-y-1">
@@ -193,6 +195,7 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
             <span className="text-sm font-bold text-gray-700">결과</span>
             {result && !isRunning && (
               <div className="flex gap-2">
+                <SpeakButton text={result} label="결과 읽어주기" />
                 <button
                   onClick={handleCopy}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors font-medium"

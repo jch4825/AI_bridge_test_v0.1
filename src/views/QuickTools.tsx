@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { motion } from 'motion/react';
 import { TOOLS, ToolDefinition } from '../tools/ToolRegistry';
 import ToolPage from './ToolPage';
+import SpeakButton from '../components/SpeakButton';
 
 export default function QuickTools() {
   const [query, setQuery] = useState('');
@@ -46,13 +47,21 @@ export default function QuickTools() {
           {filtered.map((tool, i) => {
             const Icon = tool.icon;
             return (
-              <motion.button
+              <motion.div
                 key={tool.id}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
                 onClick={() => setActiveTool(tool)}
-                className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md hover:border-gray-300 transition-all text-left group"
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveTool(tool);
+                  }
+                }}
+                className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md hover:border-gray-300 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-canva-purple/40"
               >
                 <div className={`h-28 bg-gradient-to-br ${tool.gradient} flex items-center justify-center`}>
                   <Icon size={40} className="text-white/90" />
@@ -61,9 +70,16 @@ export default function QuickTools() {
                   <p className="font-bold text-sm text-gray-900 leading-tight mb-1 group-hover:text-canva-purple transition-colors">
                     {tool.title}
                   </p>
-                  <p className="text-xs text-gray-500 leading-relaxed">{tool.description}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed mb-2">{tool.description}</p>
+                  <div onClick={e => e.stopPropagation()}>
+                    <SpeakButton
+                      text={`${tool.title}. ${tool.description}`}
+                      label="설명 듣기"
+                      stopPropagation
+                    />
+                  </div>
                 </div>
-              </motion.button>
+              </motion.div>
             );
           })}
         </div>
