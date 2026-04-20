@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
-import TopNav from './components/TopNav';
+import { Menu } from 'lucide-react';
+import AccessibilityWidget from './components/AccessibilityWidget';
 import Home from './views/Home';
 import Tutorial from './views/Tutorial';
 import QuickTools from './views/QuickTools';
@@ -8,6 +9,7 @@ import { ViewType, Module } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.has('lesson') ? 'tutorial' : 'home';
@@ -72,27 +74,18 @@ export default function App() {
     }
   };
 
-  if (currentView === 'tools') {
-    return (
-      <div className="min-h-screen bg-canva-bg font-sans text-canva-ink">
-        <TopNav currentView={currentView} onViewChange={handleViewChange} />
-        <AnimatePresence mode="wait">
-          <motion.div
-            key="tools"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <QuickTools />
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-canva-bg font-sans text-canva-ink">
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-canva-border z-40 flex items-center px-4 justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold text-canva-teal tracking-tighter">AI Bridge</h1>
+        </div>
+        <button onClick={() => setIsMobileMenuOpen(true)}>
+          <Menu size={24} className="text-canva-ink" />
+        </button>
+      </div>
+
       <Sidebar
         currentView={currentView}
         onViewChange={handleViewChange}
@@ -102,9 +95,11 @@ export default function App() {
           setSelectedModule(mod);
         }}
         completedLessons={completedLessons}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
 
-      <main className="pl-64 min-h-screen">
+      <main className="md:pl-64 pt-16 md:pt-0 min-h-screen">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentView}
@@ -117,6 +112,7 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </main>
+      <AccessibilityWidget />
     </div>
   );
 }
