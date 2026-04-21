@@ -27,7 +27,7 @@ export default function TopNav({ currentView, onViewChange }: TopNavProps) {
   const navItems = [
     { id: 'home' as ViewType, label: '홈', icon: Home },
     { id: 'resources' as ViewType, label: '자료실', icon: BookOpen },
-    { id: 'tutorial' as ViewType, label: '튜토리얼', icon: GraduationCap },
+    { id: 'tutorial' as ViewType, label: '인공지능 배워보기', icon: GraduationCap },
   ];
 
   return (
@@ -41,7 +41,7 @@ export default function TopNav({ currentView, onViewChange }: TopNavProps) {
             AI Bridge
           </button>
           <span className="text-gray-300 text-xs">·</span>
-          <span className="text-sm font-bold text-gray-500">Quick Tools</span>
+          <span className="text-sm font-bold text-gray-500">AI 도구 모음</span>
         </div>
 
         <div className="flex items-center gap-1">
@@ -111,7 +111,7 @@ export default function TopNav({ currentView, onViewChange }: TopNavProps) {
                   </p>
                   <button
                     onClick={() => {
-                      if (confirm('저장된 API 키를 삭제하시겠습니까?\n브라우저에서 완전히 제거됩니다.')) {
+                      if (window.confirm('저장된 API 키를 삭제하시겠습니까?\n브라우저에서 완전히 제거됩니다.')) {
                         localStorage.removeItem('gemini-api-key');
                         setShowApiModal(false);
                         window.location.reload();

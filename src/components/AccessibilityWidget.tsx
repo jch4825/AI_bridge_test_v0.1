@@ -87,6 +87,10 @@ export default function AccessibilityWidget() {
       x: startPos.x,
       y: startPos.y,
     };
+    
+    // Modern way to handle dragging: capture the pointer
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
     setPos(startPos);
     setDragging(true);
     e.preventDefault();
@@ -98,9 +102,12 @@ export default function AccessibilityWidget() {
     { value: 'xlarge', label: '더 크게', size: 'text-base' },
   ];
 
-  const style: React.CSSProperties = pos
-    ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' }
-    : { right: 16, bottom: 16 };
+  const style: React.CSSProperties = {
+    ...(pos
+      ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto', transform: 'none' }
+      : { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', right: 'auto', bottom: 'auto' }),
+    touchAction: 'none' // Prevent scrolling while dragging on mobile
+  };
 
   return (
     <div
@@ -114,11 +121,12 @@ export default function AccessibilityWidget() {
         onPointerDown={handleDragStart}
         aria-label="위젯 이동 (드래그)"
         title="드래그해서 위치 이동"
-        className={`flex items-center px-1 py-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 ${
+        style={{ touchAction: 'none' }}
+        className={`flex items-center px-2 py-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 ${
           dragging ? 'cursor-grabbing' : 'cursor-grab'
         }`}
       >
-        <GripVertical size={14} />
+        <GripVertical size={16} />
       </button>
       <Type size={16} className="text-gray-500" aria-hidden />
       <span className="text-xs text-gray-500 font-medium hidden sm:inline">글자 크기</span>
