@@ -35,10 +35,14 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
       .filter(Boolean)
       .join('\n');
 
+  const hasApiKey = (() => {
+    const key = localStorage.getItem('gemini-api-key');
+    return !!(key && key.length > 10);
+  })();
+
   const handleRun = async () => {
-    const apiKey = localStorage.getItem('gemini-api-key');
-    if (!apiKey) {
-      alert('API 키가 없습니다. 상단의 "API 키 등록" 버튼을 눌러 먼저 등록해주세요.');
+    if (!hasApiKey) {
+      alert('API 키가 없습니다. 좌측 메뉴 하단의 "API 키 등록" 버튼을 눌러 먼저 등록해주세요.');
       return;
     }
     const required = tool.inputs.filter(i => i.required);
@@ -52,6 +56,7 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
     setResult('');
 
     try {
+      const apiKey = localStorage.getItem('gemini-api-key') || '';
       const ai = new GoogleGenAI({ apiKey });
       const userMessage = buildUserMessage();
       const response = await ai.models.generateContentStream({
@@ -108,6 +113,21 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
         </div>
         <SpeakButton text={`${tool.title}. ${tool.description}`} label="도구 설명 듣기" />
       </div>
+
+      {!hasApiKey && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 mb-6 text-sm text-red-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <p className="font-bold mb-1">API 키가 등록되지 않았습니다.</p>
+            <p className="text-xs opacity-90">AI 도구 모음을 사용하려면 좌측 하단의 'API 키 등록' 버튼을 통해 키를 먼저 입력해주세요.</p>
+          </div>
+          <button 
+            onClick={() => window.location.href = '?lesson=l1-4'}
+            className="text-xs bg-red-100 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors font-bold whitespace-nowrap"
+          >
+            등록 방법 알아보기
+          </button>
+        </div>
+      )}
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 text-xs text-amber-700 space-y-1">
         <p>⚠️ <strong>개인 정보를 입력하지 마세요.</strong></p>
@@ -169,13 +189,22 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
 
       <button
         onClick={handleRun}
-        disabled={isRunning}
-        className={`w-full py-4 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2 transition-all bg-gradient-to-r ${tool.gradient} disabled:opacity-60`}
+        disabled={isRunning || !hasApiKey}
+        className={`w-full py-4 rounded-2xl font-bold text-base flex items-center justify-center gap-2 transition-all ${
+          !hasApiKey 
+            ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+            : `bg-gradient-to-r ${tool.gradient} text-white disabled:opacity-60`
+        }`}
       >
         {isRunning ? (
           <>
             <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             생성 중...
+          </>
+        ) : !hasApiKey ? (
+          <>
+            <Sparkles size={18} />
+            API 키 등록 후 사용 가능
           </>
         ) : (
           <>

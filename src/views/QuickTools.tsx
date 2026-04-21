@@ -23,7 +23,7 @@ export default function QuickTools() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Quick Tools</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">AI 도구 모음</h1>
         <p className="text-sm text-gray-500">입력하고 버튼 누르면 끝. 결과는 구글 Docs로 바로 이동.</p>
       </div>
 

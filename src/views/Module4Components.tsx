@@ -72,22 +72,22 @@ export const Lesson42Interactive = ({ onExecute }: { onExecute: (data: {title: s
     
     const promptText = `[4-1에서 만든 학교 컨텍스트]를 여기에 붙여넣습니다.
 
-[${taskType} 하네스 규칙]
+[${taskType} 프롬프트 템플릿 규칙]
 ${taskType} 작성 시 아래 규칙을 반드시 따릅니다:
 ${selectedRules.join('\n')}
 
 이 설정으로 ${taskType} 주제만 말하면 즉시 초안을 작성합니다.`;
     
     onExecute({
-      title: '나만의 행정 업무 하네스',
+      title: '나만의 행정 업무 프롬프트 템플릿',
       content: promptText,
-      point: '완성된 하네스를 프롬프트 창에 넣으면, 매번 형식을 지정하지 않아도 "[입력 정보]"만 바꾸어 무한 재사용이 가능해집니다.'
+      point: '완성된 프롬프트 템플릿을 프롬프트 창에 넣으면, 매번 형식을 지정하지 않아도 "[입력 정보]"만 바꾸어 무한 재사용이 가능해집니다.'
     });
   };
 
   return (
     <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-4 overflow-y-auto">
-      <div className="text-white font-bold mb-2">나의 행정 업무 하네스 만들기</div>
+      <div className="text-white font-bold mb-2">나의 행정 업무 프롬프트 템플릿 만들기</div>
       
       <div className="space-y-4">
         <div>
@@ -102,7 +102,7 @@ ${selectedRules.join('\n')}
         </div>
         
         <div>
-          <label className="text-xs text-gray-400 block mb-2">2단계: 하네스 구성 요소 선택</label>
+          <label className="text-xs text-gray-400 block mb-2">2단계: 프롬프트 템플릿 구성 요소 선택</label>
           <div className="space-y-2 text-sm text-gray-300 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
             {taskOptions[taskType]?.map(rule => (
               <label key={rule} className="flex items-start gap-2 cursor-pointer">
@@ -123,7 +123,7 @@ ${selectedRules.join('\n')}
         onClick={handleGenerate}
         className="w-full py-3 bg-canva-purple text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg mt-2"
       >
-        하네스 생성하기
+        프롬프트 템플릿 생성하기
       </button>
     </div>
   );
@@ -177,7 +177,7 @@ export const Lesson43Interactive = ({ onExecute }: { onExecute: (data: {title: s
 export const Lesson44Interactive = ({ onExecute }: { onExecute: (data: {title: string, content: React.ReactNode, point: string, hideDocsButton?: boolean}) => void }) => {
   const promptText = `(여기에 4-1에서 만든 학교 시스템 프롬프트를 붙여넣으세요)
 
-(여기에 4-2에서 만든 행정 업무 하네스를 적절히 붙여넣으세요)
+(여기에 4-2에서 만든 행정 업무 프롬프트 템플릿을 적절히 붙여넣으세요)
 
 위 규칙을 바탕으로 사용자가 요구하는 문서를 작성하고, 사용자가 앱에서 문서를 편하게 만들어갈 수 있도록 만들어주세요.`;
 
@@ -197,7 +197,7 @@ export const Lesson44Interactive = ({ onExecute }: { onExecute: (data: {title: s
       <div className="text-sm text-gray-300 bg-gray-800/50 p-4 rounded-lg">
         <ul className="list-decimal pl-4 space-y-2">
           <li><a href="https://aistudio.google.com/build" target="_blank" rel="noopener noreferrer" className="text-canva-teal hover:underline font-bold">Google AI Studio Build</a> 에 접속하여 새 창을 엽니다.</li>
-          <li>기존에 작성해 두었던 <strong>[4-1 시스템 프롬프트]</strong>와 <strong>[4-2 하네스]</strong> 내용을 조합합니다.</li>
+          <li>기존에 작성해 두었던 <strong>[4-1 시스템 프롬프트]</strong>와 <strong>[4-2 프롬프트 템플릿]</strong> 내용을 조합합니다.</li>
           <li>AI에게 아래와 같이 지시하여 나만의 도구를 만듭니다.</li>
         </ul>
       </div>

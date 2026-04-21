@@ -12,7 +12,7 @@ export default function Home({ onViewChange }: HomeProps) {
   const parts = [
     {
       id: 'tutorial',
-      title: '튜토리얼',
+      title: '인공지능 배워보기',
       subtitle: '핵심 학습 경로',
       description: 'LLM 이해부터 윤리 점검까지, 초등교사를 위한 체계적인 로드맵입니다.',
       icon: GraduationCap,
@@ -20,7 +20,7 @@ export default function Home({ onViewChange }: HomeProps) {
     },
     {
       id: 'tools',
-      title: 'Quick Tools',
+      title: 'AI 도구 모음',
       subtitle: '즉시 활용 도구',
       description: '생기부 초안, 수업안 생성 등 지금 당장 쓸 수 있는 AI 도구 모음입니다.',
       icon: Wrench,

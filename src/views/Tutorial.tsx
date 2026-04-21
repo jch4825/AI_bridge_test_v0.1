@@ -431,7 +431,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                   {hasApiKey && (
                     <button
                       onClick={() => {
-                        if (confirm('저장된 API 키를 삭제하시겠습니까?\n공용 PC에서는 사용 후 꼭 해제해 주세요.')) {
+                        if (window.confirm('저장된 API 키를 삭제하시겠습니까?\n공용 PC에서는 사용 후 꼭 해제해 주세요.')) {
                           localStorage.removeItem('gemini-api-key');
                           setHasApiKey(false);
                         }
@@ -532,7 +532,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                             className="px-4 py-3 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all shadow-lg"
                             title="2-6에서 생성한 메타 프롬프트를 클립보드에 복사합니다. Gems의 요청 사항 칸에 붙여넣으세요."
                           >
-                            {metaPromptCopied ? '✓ 복사됨! Gems 요청 사항에 붙여넣기' : '2-6 메타 프롬프트 복사'}
+                            {metaPromptCopied ? '✓ 복사됨! Gems 요청 사항에 붙여넣기' : '2-6에서 만든 프롬프트 복사'}
                           </button>
                         )}
                         {(lesson.id === 'l2-6' || lesson.id === 'l2-7' || lesson.moduleId === 'm3') && (
@@ -811,6 +811,13 @@ export default function Tutorial({ selectedModule, onSelectModule, completedLess
   // 사이드바에서 모듈이 바뀌면 현재 레슨 초기화
   useEffect(() => {
     if (!initialLoadDone) return;
+    
+    // 초기 로딩으로 인해 App.tsx의 selectedModule이 뒤늦게 업데이트되었을 때
+    // 화면이 튕기는 현상 방지
+    if (currentLesson && selectedModule?.id === currentLesson.moduleId) {
+      return;
+    }
+    
     setCurrentLesson(null);
   }, [selectedModule?.id, initialLoadDone]);
 
@@ -820,7 +827,7 @@ export default function Tutorial({ selectedModule, onSelectModule, completedLess
   const renderModuleList = () => (
     <div className="max-w-4xl mx-auto p-10">
       <header className="mb-12">
-        <h1 className="text-3xl font-bold text-canva-ink mb-4">학습 튜토리얼</h1>
+        <h1 className="text-3xl font-bold text-canva-ink mb-4">인공지능 배워보기</h1>
         <p className="text-canva-ink">LLM 이해부터 윤리 점검까지, 초등교사를 위한 5단계 로드맵입니다.</p>
       </header>
 
