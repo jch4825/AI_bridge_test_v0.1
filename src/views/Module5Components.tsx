@@ -617,7 +617,7 @@ interface Lesson55Props {
 
 export const Lesson55Interactive = ({ onRun, setUserInput, onNavigateToLesson }: Lesson55Props = {}) => {
   const [activeTab, setActiveTab] = useState<'lower' | 'middle' | 'upper'>('lower');
-  const [schoolLevel, setSchoolLevel] = useState('초등학교 중학년 (3~4학년)');
+  const [schoolLevel, setSchoolLevel] = useState('초등학교 3-4학년군');
   const [studentCount, setStudentCount] = useState('24');
   const [studentTraits, setStudentTraits] = useState('');
   const [ethicsFocus, setEthicsFocus] = useState('종합');
@@ -758,9 +758,9 @@ export const Lesson55Interactive = ({ onRun, setUserInput, onNavigateToLesson }:
   };
 
   const tabConfig = [
-    { id: 'lower' as const, label: '저학년 (1~2학년)', emoji: '🌱' },
-    { id: 'middle' as const, label: '중학년 (3~4학년)', emoji: '🌿' },
-    { id: 'upper' as const, label: '고학년 (5~6학년)', emoji: '🌳' }
+    { id: 'lower' as const, label: '초등 1-2학년군', emoji: '🌱' },
+    { id: 'middle' as const, label: '초등 3-4학년군', emoji: '🌿' },
+    { id: 'upper' as const, label: '초등 5-6학년군', emoji: '🌳' }
   ];
 
   return (
@@ -785,9 +785,9 @@ export const Lesson55Interactive = ({ onRun, setUserInput, onNavigateToLesson }:
               onChange={(e) => setSchoolLevel(e.target.value)}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-canva-purple"
             >
-              <option>초등학교 저학년 (1~2학년)</option>
-              <option>초등학교 중학년 (3~4학년)</option>
-              <option>초등학교 고학년 (5~6학년)</option>
+              <option>초등학교 1-2학년군</option>
+              <option>초등학교 3-4학년군</option>
+              <option>초등학교 5-6학년군</option>
               <option>중학교 1학년</option>
               <option>중학교 2학년</option>
               <option>중학교 3학년</option>
