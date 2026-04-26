@@ -1,13 +1,22 @@
-import { BookOpen, FileText, MessageCircle, ClipboardCheck, SlidersHorizontal, Shield, Bot, Wand2, Film, Newspaper, Mail } from 'lucide-react';
+import { BookOpen, FileText, MessageCircle, ClipboardCheck, SlidersHorizontal, Shield, Bot, Wand2, Film, Newspaper, Mail, ExternalLink, Lightbulb, NotebookPen, BrainCircuit, BookOpenText, BookA, FolderKanban, Presentation } from 'lucide-react';
 
 export interface ToolInput {
   id: string;
   label: string;
-  type: 'textarea' | 'text' | 'select' | 'number';
+  type: 'textarea' | 'text' | 'select' | 'number' | 'multiselect';
   placeholder?: string;
+  /** select / multiselect 타입에서 사용. multiselect는 다중 선택. */
   options?: { value: string; label: string }[];
   required?: boolean;
   rows?: number;
+  /** UI 도움말 (입력란 아래에 작은 글씨로 노출) */
+  hint?: string;
+  /**
+   * 입력값을 외부 데이터로 자동 보강.
+   * - 'curriculumStandard': 입력값을 2022 개정 교육과정 코드로 해석해 공식 성취기준+수준별 평가 기준을 시스템에 주입.
+   *   라이브 미리보기 박스도 함께 표시.
+   */
+  enrichWith?: 'curriculumStandard';
 }
 
 export interface ToolDefinition {
@@ -19,6 +28,14 @@ export interface ToolDefinition {
   systemPrompt: string;
   inputs: ToolInput[];
   tags: string[];
+  /** 'api' = 내장 Gemini 호출 도구, 'external' = 외부 사이트로 이동 */
+  kind?: 'api' | 'external';
+  /** kind === 'external' 일 때 사용. 새 탭으로 이동 */
+  externalUrl?: string;
+  /** kind === 'external' 일 때 카드에 작게 노출 (예: 'canva.com') */
+  hostLabel?: string;
+  /** 이 도구가 등장한 레슨 ID 배열. 첫 번째 항목으로 모듈 색상 메달 표시 (예: ['l3-1','l3-2']) */
+  usedInLessons?: string[];
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -40,6 +57,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['수업', '지도안'],
+    usedInLessons: ['l3-2'],
   },
   {
     id: 'grade-report',
@@ -78,6 +96,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['생기부', '세특', '학생'],
+    usedInLessons: ['l3-6'],
   },
   {
     id: 'questioning',
@@ -97,6 +116,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['수업', '발문'],
+    usedInLessons: ['l3-4'],
   },
   {
     id: 'rubric',
@@ -116,6 +136,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['평가', '루브릭'],
+    usedInLessons: ['l3-5'],
   },
   {
     id: 'differentiation',
@@ -146,6 +167,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['수업', '학습지'],
+    usedInLessons: ['l3-3'],
   },
   {
     id: 'ethics-lesson',
@@ -235,6 +257,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['AI교육', '윤리', '지도안'],
+    usedInLessons: ['l5-5'],
   },
   {
     id: 'chatbot',
@@ -254,6 +277,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['AI도구', '챗봇'],
+    usedInLessons: ['l3-8'],
   },
   {
     id: 'prompt-optimizer',
@@ -280,6 +304,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['AI도구', '프롬프트'],
+    usedInLessons: ['l2-6'],
   },
   {
     id: 'media-prompt',
@@ -306,6 +331,7 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['AI도구', '멀티미디어'],
+    usedInLessons: ['l2-7'],
   },
   {
     id: 'press-release',
@@ -491,5 +517,838 @@ export const TOOLS: ToolDefinition[] = [
       },
     ],
     tags: ['행정', '가정통신문', '학부모'],
+  },
+  {
+    id: 'activity-idea',
+    title: '수업 활동 아이디어',
+    description: '학년·교과·환경 입력하면 즉시 활동안 생성',
+    icon: Lightbulb,
+    gradient: 'from-yellow-400 to-amber-600',
+    systemPrompt: `너는 초등학교 교사를 위한 '수업 활동 아이디어 생성 전문가'야. 사용자가 입력한 학년, 교과, 단원, 수업 목표, 수업 형태, 활동 시간, 수업 환경, 아이디어 수에 맞춰 실제 교실에서 바로 적용 가능한 활동 아이디어를 생성해.
+
+[필수 출력 구조]
+각 활동 아이디어는 반드시 아래 5개 항목을 순서대로 포함해야 한다:
+1. **활동명** — 직관적이고 매력적인 한 줄 제목
+2. **수업 목표** — 사용자가 입력한 '수업 목표'와 직접 연결되는 구체적 학습 결과
+3. **준비물** — 교실에 흔히 있거나 손쉽게 구할 수 있는 것 위주
+4. **진행 방법** — 도입(2~3분) → 전개 → 정리 순으로 단계별 시간 배분 포함
+5. **교사 팁** — 학생 수준 차이 대응, 흔한 어려움, 안전·관리 포인트 등
+
+[필수 준수 규칙]
+- '아이디어 수'가 1개면 깊이 있게 한 가지를, 3개면 난이도(쉬움/보통/심화) 또는 방식(개별/협동/탐구)이 서로 다른 3가지를 제시해.
+- '수업 환경' 항목에 포함되지 않은 도구·공간은 절대 활용하지 않는다. (예: '일반 교실만'이 선택되면 야외 활동·특별실·스마트기기 활동을 제안하지 않는다)
+- '활동 시간'을 초과하지 않도록 단계별 시간을 합산해 검증한다.
+- 학년 발달 단계에 어울리는 어휘·과업 난이도로 작성한다.
+- 활동마다 학생들이 무엇을 '말하거나, 쓰거나, 만들거나, 움직이는지' 구체적으로 묘사한다 — 추상어("탐구한다", "체험한다")만 나열하지 않는다.
+- 출력 언어: 한국어. 표(마크다운 테이블)는 사용하지 않는다.
+- 마지막에 "**📌 활용 팁**" 한 줄로 평가·관찰 포인트나 후속 활동 제안을 덧붙인다.`,
+    inputs: [
+      {
+        id: 'grade',
+        label: '학년',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '1학년', label: '1학년' },
+          { value: '2학년', label: '2학년' },
+          { value: '3학년', label: '3학년' },
+          { value: '4학년', label: '4학년' },
+          { value: '5학년', label: '5학년' },
+          { value: '6학년', label: '6학년' },
+        ],
+      },
+      {
+        id: 'subject',
+        label: '교과목',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '국어', label: '국어' },
+          { value: '수학', label: '수학' },
+          { value: '과학', label: '과학' },
+          { value: '사회', label: '사회' },
+          { value: '도덕', label: '도덕' },
+          { value: '음악', label: '음악' },
+          { value: '미술', label: '미술' },
+          { value: '체육', label: '체육' },
+          { value: '영어', label: '영어' },
+          { value: '통합', label: '통합 (1·2학년)' },
+        ],
+      },
+      {
+        id: 'unit_topic',
+        label: '단원 / 주제',
+        type: 'text',
+        placeholder: '예) 분수의 덧셈, 날씨와 우리 생활',
+        required: true,
+      },
+      {
+        id: 'goal',
+        label: '수업 목표',
+        type: 'textarea',
+        placeholder: '예) 분수의 덧셈 원리를 이해하고 분모가 같은 분수의 덧셈을 계산할 수 있다',
+        required: true,
+        rows: 2,
+      },
+      {
+        id: 'class_type',
+        label: '수업 형태',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '개인 활동', label: '개인 활동' },
+          { value: '모둠 활동 (4~5명)', label: '모둠 활동 (4~5명)' },
+          { value: '전체 활동', label: '전체 활동' },
+        ],
+      },
+      {
+        id: 'duration',
+        label: '활동 시간',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '10분 (도입·정리용)', label: '10분 (도입·정리용)' },
+          { value: '20분 (부분 활동)', label: '20분 (부분 활동)' },
+          { value: '40분 (전체 차시)', label: '40분 (전체 차시)' },
+        ],
+      },
+      {
+        id: 'environment',
+        label: '수업 환경',
+        type: 'multiselect',
+        required: true,
+        hint: '체크한 환경만 활용한 활동이 제안됩니다. 1개 이상 선택하세요.',
+        options: [
+          { value: '일반 교실만', label: '일반 교실만' },
+          { value: '스마트기기 사용 가능', label: '스마트기기 사용 가능' },
+          { value: '야외 활동 가능', label: '야외 활동 가능' },
+          { value: '특별실(과학실·음악실 등) 이용 가능', label: '특별실 이용 가능' },
+        ],
+      },
+      {
+        id: 'idea_count',
+        label: '아이디어 수',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '1개 (한 가지를 깊이)', label: '1개 (한 가지를 깊이)' },
+          { value: '3개 (난이도·방식이 다른 3가지)', label: '3개 (선택형)' },
+        ],
+      },
+    ],
+    tags: ['수업', '활동', '아이디어'],
+  },
+  {
+    id: 'lesson-plan-detailed',
+    title: '세안 작성 도우미',
+    description: '성취기준·차시 입력하면 발문·예상응답·루브릭까지 완성형 세안 생성',
+    icon: NotebookPen,
+    gradient: 'from-indigo-500 to-purple-700',
+    systemPrompt: `너는 초등학교 교사를 위한 '교수학습과정안(세안) 작성 전문가'야. 사용자가 입력한 학년, 교과, 단원, 성취기준, 본시 학습 주제, 차시, 수업 시간, 학급 인원, 활동 형태, 사용 가능한 자료·도구, 평가 방식, 특이 사항을 바탕으로 실제 수업 연구·장학·임용에서 제출 가능한 수준의 완성형 세안을 작성한다.
+
+[필수 출력 구조 — 반드시 이 순서로]
+
+## 1. 단원 개요
+- **단원명** / **본시 학습 주제** / **차시 정보** / **수업 시간**
+- **학습 목표** (학생 입장에서 한 문장, "~할 수 있다." 형식)
+- **성취기준 연동**:
+  - 입력값이 코드(예: [4수01-07], [6사03-02])이면 2022 개정 교육과정 기준으로 해당 성취기준 전문을 인용한다
+  - 입력값이 직접 기술이면 그대로 사용한다
+
+## 2. 오개념 분석 및 탈피 전략
+해당 학년·교과·주제에서 학생들에게 실제로 자주 발생하는 오개념 **3개**를 제시한다. 각 오개념마다:
+- **오개념 N:** (학생이 흔히 빠지는 잘못된 이해 한 줄)
+- **원인:** 왜 그런 오개념이 생기는지 1~2줄
+- **탈피 전략:** 본 차시 수업에서 이 오개념을 어떻게 직접 다룰지 구체적 방법
+
+## 3. 본시 수업 흐름
+세션을 **도입 → 전개 → 정리** 순서로 작성한다. 각 세션마다 다음 구조를 지킨다:
+
+### 도입 (X분)
+| 단계 | 내용 |
+없이 마크다운 리스트로 작성한다. 표는 사용하지 않는다.
+- **활동:** 어떤 활동인지 한 줄
+- **교사 발문:** 실제 교실에서 사용할 발문을 큰따옴표로 명시 (단순 확인형 X, 사고 유발 발산형/수렴형 O)
+- **학생 예상 응답:** 발문에 대해 학생들이 보일 만한 응답 2~3가지 (정답 / 부분 정답 / 오개념 응답 포함)
+- **자료·도구:** 사용 가능한 자료·도구 목록에 있는 것만 사용
+
+### 전개 (X분)
+같은 구조로 2~3개의 활동 단계 작성
+
+### 정리 (X분)
+같은 구조로 마무리 활동 작성
+
+세션별 시간 합계가 입력된 '수업 시간'과 일치해야 한다.
+
+## 4. 평가 루브릭
+사용자가 선택한 평가 방식별로 **상·중·하** 3수준 기술. 각 수준은:
+- **상:** 학생이 보일 행동·산출물을 구체적으로 묘사
+- **중:** 일반적 수준의 도달 양상
+- **하:** 도달이 미흡한 양상과 추가 지원 방향
+
+## 5. 차별화 지도 (특이 사항이 입력된 경우만)
+입력된 특이 사항(학습 부진, 다문화, 영재 등)에 대한 세션별 차별화 전략을 간단히 정리한다.
+
+[필수 준수 규칙]
+- '사용 가능한 자료·도구'에 체크되지 않은 항목은 절대 활용하지 않는다.
+- '활동 형태'(개인/모둠/혼합)에 맞춰 발문 방식과 활동 구조를 조정한다 (모둠이면 "각 모둠에서 …", 개인이면 "각자 학습지에 …" 등).
+- '학급 인원 수'에 맞춰 모둠 수 / 활동 운영 규모를 현실적으로 제안한다.
+- 출력 언어: 한국어. 표(마크다운 테이블)는 절대 사용하지 않는다 — 모든 정보는 헤딩 + 리스트 + 인용으로 구조화한다.
+- 결과물은 그대로 한글 문서·세안 양식에 붙여넣을 수 있는 수준이어야 한다.`,
+    inputs: [
+      {
+        id: 'grade',
+        label: '학년',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '1학년', label: '1학년' },
+          { value: '2학년', label: '2학년' },
+          { value: '3학년', label: '3학년' },
+          { value: '4학년', label: '4학년' },
+          { value: '5학년', label: '5학년' },
+          { value: '6학년', label: '6학년' },
+        ],
+      },
+      {
+        id: 'subject',
+        label: '교과목',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '국어', label: '국어' },
+          { value: '수학', label: '수학' },
+          { value: '과학', label: '과학' },
+          { value: '사회', label: '사회' },
+          { value: '도덕', label: '도덕' },
+          { value: '음악', label: '음악' },
+          { value: '미술', label: '미술' },
+          { value: '체육', label: '체육' },
+          { value: '영어', label: '영어' },
+          { value: '통합', label: '통합 (1·2학년)' },
+        ],
+      },
+      {
+        id: 'unit_name',
+        label: '단원명',
+        type: 'text',
+        placeholder: '예) 4. 분수의 덧셈과 뺄셈',
+        required: true,
+      },
+      {
+        id: 'achievement_standard',
+        label: '성취기준 (코드 또는 직접 기술)',
+        type: 'text',
+        placeholder: '예) [6수01-07] 또는 직접 기술',
+        required: true,
+        hint: '코드 형식([학년교과영역-순번])으로 입력하면 공식 성취기준 전문과 A·B·C 수준별 평가 기준이 자동 주입됩니다.',
+        enrichWith: 'curriculumStandard',
+      },
+      {
+        id: 'lesson_topic',
+        label: '본시 학습 주제',
+        type: 'textarea',
+        placeholder: '예) 통분을 이용하여 분모가 다른 분수의 덧셈하기',
+        required: true,
+        rows: 2,
+      },
+      {
+        id: 'total_sessions',
+        label: '단원 전체 차시 / 본시 차시',
+        type: 'text',
+        placeholder: '예) 전체 8차시 중 3차시',
+        required: true,
+      },
+      {
+        id: 'duration',
+        label: '수업 시간',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '40분', label: '40분 (초등 표준)' },
+          { value: '45분', label: '45분 (블록 수업)' },
+        ],
+      },
+      {
+        id: 'class_size',
+        label: '학급 인원 수',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '20명 이하', label: '20명 이하' },
+          { value: '21~25명', label: '21~25명' },
+          { value: '26~30명', label: '26~30명' },
+          { value: '31명 이상', label: '31명 이상' },
+        ],
+      },
+      {
+        id: 'group_type',
+        label: '활동 형태',
+        type: 'select',
+        required: true,
+        options: [
+          { value: '개인 활동 중심', label: '개인 활동 중심' },
+          { value: '모둠 활동 중심', label: '모둠 활동 중심' },
+          { value: '개인·모둠 혼합', label: '개인·모둠 혼합' },
+        ],
+      },
+      {
+        id: 'available_tools',
+        label: '사용 가능한 자료·도구',
+        type: 'multiselect',
+        required: true,
+        hint: '체크한 자료·도구만 수업 흐름에 사용됩니다. 1개 이상 선택하세요.',
+        options: [
+          { value: '교과서', label: '교과서' },
+          { value: '활동지(학습지)', label: '활동지(학습지)' },
+          { value: 'PPT/슬라이드', label: 'PPT/슬라이드' },
+          { value: '실물화상기', label: '실물화상기' },
+          { value: '스마트기기(태블릿/노트북)', label: '스마트기기' },
+          { value: '조작 교구', label: '조작 교구' },
+          { value: '영상 자료', label: '영상 자료' },
+          { value: '칠판/화이트보드', label: '칠판/화이트보드' },
+        ],
+      },
+      {
+        id: 'evaluation_method',
+        label: '평가 방식',
+        type: 'multiselect',
+        required: true,
+        hint: '체크한 평가 방식별로 상·중·하 루브릭이 작성됩니다.',
+        options: [
+          { value: '관찰 평가', label: '관찰 평가' },
+          { value: '활동지(서답형) 평가', label: '활동지 평가' },
+          { value: '구술 평가', label: '구술 평가' },
+          { value: '동료 평가', label: '동료 평가' },
+          { value: '자기 평가', label: '자기 평가' },
+        ],
+      },
+      {
+        id: 'special_notes',
+        label: '특이 사항 (선택)',
+        type: 'textarea',
+        placeholder: '예) 학습 부진 학생 3명, 다문화 학생 2명, 영재 1명 포함',
+        rows: 2,
+        hint: '입력 시 해당 학생을 위한 차별화 지도 전략이 추가로 작성됩니다.',
+      },
+    ],
+    tags: ['수업', '세안', '교수학습과정안', '평가'],
+  },
+  {
+    id: 'ai-fusion-lesson',
+    title: 'AI 융합수업 구상',
+    description: '교과·환경 입력하면 AI를 자연스럽게 녹인 수업안 생성',
+    icon: BrainCircuit,
+    gradient: 'from-fuchsia-500 to-purple-700',
+    systemPrompt: `너는 'AI 융합수업 구상 전문가'야. AI 비전문가인 일반 초등 교사도 그대로 실행할 수 있는, 교과 학습 목표와 AI 활용이 자연스럽게 어우러진 융합수업안을 작성한다.
+
+[필수 출력 구조 — 반드시 이 순서]
+
+## 1. 수업 개요
+- **교과 학습 목표** (학생 입장 한 문장)
+- **AI 융합 목적** — 왜 이 수업에 AI를 쓰는가? (억지 융합 금지: AI가 학습 목표 달성에 어떻게 직접 기여하는지 명시)
+
+## 2. AI 도구 안내
+사용할 AI 도구마다:
+- **도구명** + 한 줄 설명
+- **접속 방법** (URL, 회원가입 필요 여부, 무료/유료)
+- **교사 사전 준비 사항** (계정 생성, 예시 자료, 시연 연습 등)
+- **학생 사용 방법** (단계별 1·2·3 — 화면 어디 어떻게 클릭/입력)
+
+## 3. 수업 흐름
+**도입(X분) → 전개(X분) → 정리(X분)** 각 단계에:
+- 활동 한 줄
+- AI를 어떻게 활용하는지 구체적으로
+- 교사 발문 (큰따옴표 명시)
+- 학생 행동 (말하기/쓰기/만들기/움직이기 중 무엇)
+- 시간 합계가 입력된 '수업 시간'과 일치해야 함
+
+## 4. 교사 역할 안내
+AI 사용 중 교사가 해야 할 일:
+- 모니터링 포인트 (어떤 학생을 봐야 하는가)
+- 흔히 발생하는 어려움과 대응
+- 안전·관리 주의사항
+
+## 5. AI 윤리 교육 요소 (포함 시에만)
+이 수업 맥락에 맞는 윤리 토론 질문 2~3개 + 5분 내 진행 가능한 짧은 활동.
+
+## 6. 실행 팁
+- 기기 오류 시 대안 활동 (인터넷 끊김, 도구 접속 실패 등)
+- 진도 차이 큰 학생 대응
+- 시간 모자랄 때 자를 수 있는 부분
+
+[필수 준수 규칙]
+- 'AI 융합 수준'에 따라 AI 역할 비중 조정:
+  · 체험 중심: AI를 신기한 도구로 만나는 데 초점 (가볍게)
+  · 활용 중심: AI를 과제 해결 도구로 사용 (중심 활동)
+  · 탐구 중심: AI 작동 원리·한계를 이해하는 활동 포함 (분석 비중↑)
+- '기기 환경'이 '교사 시연만'이면 학생 직접 조작 활동을 절대 제안하지 않고 시연·관찰·발문 중심으로 재구성한다.
+- 'AI 도구'가 비어 있거나 '추천 받고 싶음'이면 학년·교과·융합 수준에 맞는 무료·회원가입 부담 적은 도구 2~3개를 먼저 추천하고 그중 하나를 골라 수업 구상.
+- '제약 조건'이 입력되면 그 조건을 우회하는 대안 도구·오프라인 병행 활동을 제안한다.
+- '윤리 교육 미포함'이면 5번 섹션을 통째로 생략한다.
+- 출력 언어: 한국어. 표 사용 금지.`,
+    inputs: [
+      { id: 'grade', label: '학년', type: 'select', required: true,
+        options: [
+          { value: '1학년', label: '1학년' }, { value: '2학년', label: '2학년' },
+          { value: '3학년', label: '3학년' }, { value: '4학년', label: '4학년' },
+          { value: '5학년', label: '5학년' }, { value: '6학년', label: '6학년' },
+        ],
+      },
+      { id: 'subject', label: '융합 대상 교과목', type: 'select', required: true,
+        options: [
+          { value: '국어', label: '국어' }, { value: '수학', label: '수학' },
+          { value: '과학', label: '과학' }, { value: '사회', label: '사회' },
+          { value: '도덕', label: '도덕' }, { value: '음악', label: '음악' },
+          { value: '미술', label: '미술' }, { value: '체육', label: '체육' },
+          { value: '영어', label: '영어' }, { value: '통합', label: '통합' },
+        ],
+      },
+      { id: 'unit_topic', label: '단원 / 주제', type: 'text', required: true,
+        placeholder: '예) 환경 보호, 우리 고장의 문화유산',
+      },
+      { id: 'ai_tool_preference', label: '사용 희망 AI 도구 (선택)', type: 'text',
+        placeholder: '예) 뤼튼, 클로바, 티처블머신, ChatGPT, 또는 비워두면 추천',
+        hint: '비워두면 학년·교과에 맞는 도구를 자동 추천합니다.',
+      },
+      { id: 'device_environment', label: '기기 환경', type: 'select', required: true,
+        options: [
+          { value: '1인 1기기', label: '1인 1기기' },
+          { value: '모둠당 1기기', label: '모둠당 1기기' },
+          { value: '교사 시연만 가능 (학생 직접 조작 불가)', label: '교사 시연만 가능' },
+        ],
+      },
+      { id: 'ai_integration_level', label: 'AI 융합 수준', type: 'select', required: true,
+        options: [
+          { value: '체험 중심 (AI가 뭔지 경험)', label: '체험 중심 (AI가 뭔지 경험)' },
+          { value: '활용 중심 (AI로 과제 해결)', label: '활용 중심 (AI로 과제 해결)' },
+          { value: '탐구 중심 (AI 원리·한계 이해)', label: '탐구 중심 (AI 원리·한계 이해)' },
+        ],
+      },
+      { id: 'duration', label: '수업 시간', type: 'select', required: true,
+        options: [
+          { value: '40분', label: '40분 (1차시)' },
+          { value: '45분', label: '45분 (1차시)' },
+          { value: '80분 (2차시 연속)', label: '80분 (2차시 연속)' },
+        ],
+      },
+      { id: 'ethics_include', label: 'AI 윤리 교육 포함 여부', type: 'select', required: true,
+        options: [
+          { value: '포함', label: '포함 (5번 섹션 생성)' },
+          { value: '미포함', label: '미포함' },
+        ],
+      },
+      { id: 'constraints', label: '제약 조건 (선택)', type: 'textarea', rows: 2,
+        placeholder: '예) 인터넷 사용 불가, 회원가입 불가 도구만 사용',
+        hint: '입력 시 해당 제약을 우회하는 대안이 함께 제시됩니다.',
+      },
+    ],
+    tags: ['수업', 'AI', '융합'],
+  },
+  {
+    id: 'reading-material',
+    title: '수준별 읽기 자료 생성',
+    description: '학년·수준·주제 입력하면 학생 맞춤 지문·어휘 지원·이해 질문 생성',
+    icon: BookOpenText,
+    gradient: 'from-sky-500 to-cyan-600',
+    systemPrompt: `너는 '초등 수준별 읽기 자료 생성 전문가'야. 학년·독서 수준·주제·장르·길이에 정확히 맞는 한국어 지문을 만들어 낸다.
+
+[필수 출력 구조]
+
+## [지문 제목]
+사용자가 입력한 글자 수에 ±10% 이내로 맞춘 본문. 학년 발달 단계와 독서 수준에 맞는 어휘·문장 길이·문단 구성을 지킨다.
+
+## (어휘 지원 포함 시) 📘 어려운 낱말 풀이
+지문에 나온 어려운 낱말 4~6개를 골라:
+- **낱말** — 학년 수준에 맞춘 쉬운 풀이 (해당 학년 학생이 이해할 수 있는 어휘로)
+- 가능하면 비슷한 말 또는 짧은 예시 한 문장
+
+## (이해 질문 포함 시) ❓ 읽고 답해 보세요
+지문 이해를 확인할 수 있는 질문 3~5개:
+- 사실 확인형 1~2개
+- 추론·해석형 1~2개
+- 자기 생각·적용형 1개
+- 각 질문마다 (정답 또는 모범 답변)을 괄호로 작은 글씨로 함께 제시
+
+[수준별 작성 가이드]
+| 수준 | 학년별 어휘·문장 |
+- 1~2학년 기초: 1문장 ≤ 12자, 익숙한 단어 위주, 의성어·의태어 활용
+- 1~2학년 보통/심화: 1문장 ≤ 18자
+- 3~4학년 기초: 1문장 ≤ 18자, 한자어 최소화
+- 3~4학년 보통: 1문장 ≤ 25자, 일상 한자어 일부
+- 3~4학년 심화: 1문장 ≤ 30자, 비유·인과 표현 도입
+- 5~6학년 기초: 3~4학년 보통 수준 어휘
+- 5~6학년 보통: 1문장 ≤ 35자, 다양한 한자어 허용
+- 5~6학년 심화: 1문장 ≤ 50자, 추상 개념·논리 구조 포함
+
+[필수 준수 규칙]
+- 글자 수는 본문 기준 ±10% 이내로 정확히 맞출 것 (제목·풀이·질문 제외).
+- '글의 종류'에 따라 형식 지침을 정확히 지킨다 (설명문→객관·구조적, 이야기글→인물·사건·배경, 편지글→인사·본문·끝맺음, 논설문→주장·근거·결론).
+- '교육과정 연계 단원'이 입력되면 해당 단원에서 다룰 만한 학습 맥락·소재로 지문을 구성한다.
+- 어휘 지원·이해 질문 섹션은 토글에 따라 완전히 생략하거나 포함한다.
+- 인종·성별·종교 편견이 들어가지 않도록 인물·상황을 균형 있게 설정한다.
+- 출력 언어: 한국어. 표 사용 금지.`,
+    inputs: [
+      { id: 'grade', label: '학년', type: 'select', required: true,
+        options: [
+          { value: '1학년', label: '1학년' }, { value: '2학년', label: '2학년' },
+          { value: '3학년', label: '3학년' }, { value: '4학년', label: '4학년' },
+          { value: '5학년', label: '5학년' }, { value: '6학년', label: '6학년' },
+        ],
+      },
+      { id: 'reading_level', label: '독서 수준', type: 'select', required: true,
+        options: [
+          { value: '기초', label: '기초 (학습 지원이 필요한 학생)' },
+          { value: '보통', label: '보통 (일반 학생)' },
+          { value: '심화', label: '심화 (수준 높은 학생)' },
+        ],
+      },
+      { id: 'topic', label: '읽기 주제', type: 'text', required: true,
+        placeholder: '예) 환경오염, 우주탐사, 전통시장',
+      },
+      { id: 'genre', label: '글의 종류', type: 'text', required: true,
+        placeholder: '예) 설명문, 이야기글, 편지글, 논설문',
+      },
+      { id: 'length', label: '글자 수', type: 'select', required: true,
+        options: [
+          { value: '200자 내외', label: '200자 (1~2학년)' },
+          { value: '400자 내외', label: '400자 (3~4학년)' },
+          { value: '600자 내외', label: '600자 (5~6학년)' },
+          { value: '800자 내외', label: '800자 (5~6학년 심화)' },
+        ],
+      },
+      { id: 'vocabulary_support', label: '어휘 지원 포함 여부', type: 'select', required: true,
+        options: [
+          { value: '포함', label: '포함 (어려운 낱말 풀이 추가)' },
+          { value: '미포함', label: '미포함' },
+        ],
+      },
+      { id: 'comprehension_questions', label: '독후 이해 질문 포함 여부', type: 'select', required: true,
+        options: [
+          { value: '포함', label: '포함 (이해 확인 질문 3~5개 추가)' },
+          { value: '미포함', label: '미포함' },
+        ],
+      },
+      { id: 'curriculum_link', label: '교육과정 연계 단원 (선택)', type: 'text',
+        placeholder: '예) 4학년 1학기 국어 3단원',
+        hint: '입력 시 해당 단원의 학습 맥락이 지문에 반영됩니다.',
+      },
+    ],
+    tags: ['읽기', '국어', '학습지', '수준별'],
+  },
+  {
+    id: 'easy-dictionary',
+    title: '쉬운 우리말 사전',
+    description: '어려운 단어를 학년 수준 풀이·예시·학습 문제까지 한 번에',
+    icon: BookA,
+    gradient: 'from-lime-500 to-green-700',
+    systemPrompt: `너는 '초등학생을 위한 어휘 지도 전문가'야. 학생이 어려워하는 단어를 입력받아 사전 원문, 학년 수준의 쉬운 풀이, 사용 예시, 학습 문제를 함께 제공한다.
+
+[필수 출력 구조 — 반드시 이 순서]
+
+## 📖 사전 원문 (필수)
+표준국어대사전 또는 일반 사전 수준의 원문 정의를 그대로 제시 (학생이 이해 못할 수 있어도 정확성 우선).
+
+## 🌱 쉬운 풀이
+입력된 학년 학생이 이해할 수 있는 어휘와 문장 길이로 다시 풀이한다.
+- 1~2학년: 1문장 ≤ 15자, 일상 어휘만
+- 3~4학년: 2~3문장, 일상+학습 어휘
+- 5~6학년: 자세한 풀이 가능, 추상 개념 포함 가능
+- '단어가 사용된 원문 문장'이 입력되어 있으면 그 맥락에 맞춘 풀이를 우선
+- '교과목'이 입력되어 있으면 그 교과 맥락에서의 의미를 강조
+
+## 💡 사용 예시 (입력된 개수만큼)
+- 학생의 실생활·교과 맥락에서 자연스럽게 쓰이는 예문
+- '교과목'이 입력되어 있으면 그 교과의 학습 상황에서 쓰이는 예문 우선
+- 각 예시는 한 줄로 명확하게
+
+## 📝 학습 문제 (체크된 유형만)
+선택된 문제 유형마다 1~2문항씩 작성. 답은 괄호로 작은 글씨로 함께 제공.
+- **빈칸 채우기**: "다음 빈칸에 알맞은 말은? ____" 형태
+- **OX 문제**: 단어 의미·쓰임 정오 판별 ("문장: ... (O / X)")
+- **선택형**: 4지선다, 비슷한 말 또는 의미 고르기
+- **서술형**: "이 단어를 사용해 문장을 만들어 보세요." 형태
+
+[필수 준수 규칙]
+- 사전 원문은 절대 생략하지 않는다 (UI에서 토글 옵션으로도 제공하지 않음).
+- '학습 문제 유형'이 체크되지 않은 유형은 절대 만들지 않는다.
+- '단어가 사용된 원문 문장'이 비어 있으면 일반적 의미·예시로 작성한다.
+- 학생이 답을 바로 보지 않게 답은 괄호로 작은 글씨 처리.
+- 출력 언어: 한국어. 표 사용 금지.`,
+    inputs: [
+      { id: 'word', label: '검색할 단어', type: 'text', required: true,
+        placeholder: '예) 인과관계, 민주주의, 증발',
+      },
+      { id: 'grade', label: '학년 (풀이 수준 기준)', type: 'select', required: true,
+        options: [
+          { value: '1학년', label: '1학년' }, { value: '2학년', label: '2학년' },
+          { value: '3학년', label: '3학년' }, { value: '4학년', label: '4학년' },
+          { value: '5학년', label: '5학년' }, { value: '6학년', label: '6학년' },
+        ],
+      },
+      { id: 'subject', label: '단어가 나온 교과목 (선택)', type: 'select',
+        options: [
+          { value: '', label: '— 선택 안 함 —' },
+          { value: '국어', label: '국어' }, { value: '수학', label: '수학' },
+          { value: '과학', label: '과학' }, { value: '사회', label: '사회' },
+          { value: '도덕', label: '도덕' }, { value: '기타', label: '기타' },
+        ],
+      },
+      { id: 'context_sentence', label: '단어가 사용된 원문 문장 (선택)', type: 'textarea', rows: 2,
+        placeholder: '예) "인과관계를 파악하며 글을 읽어봅시다."',
+        hint: '입력 시 해당 문장의 맥락에 맞춘 풀이·예시가 생성됩니다.',
+      },
+      { id: 'example_count', label: '사용 예시 수', type: 'select', required: true,
+        options: [
+          { value: '1개', label: '1개' },
+          { value: '2개', label: '2개' },
+          { value: '3개', label: '3개' },
+        ],
+      },
+      { id: 'question_type', label: '학습 문제 유형', type: 'multiselect', required: true,
+        hint: '체크한 유형의 문제만 생성됩니다.',
+        options: [
+          { value: '빈칸 채우기', label: '빈칸 채우기' },
+          { value: 'OX 문제', label: 'OX 문제' },
+          { value: '선택형(4지선다)', label: '선택형(4지선다)' },
+          { value: '서술형', label: '서술형' },
+        ],
+      },
+    ],
+    tags: ['어휘', '국어', '사전'],
+  },
+  {
+    id: 'project-lesson',
+    title: '프로젝트 수업 기획',
+    description: '주제·산출물·차시 입력하면 백워드 디자인으로 전체 계획 생성',
+    icon: FolderKanban,
+    gradient: 'from-orange-500 to-red-700',
+    systemPrompt: `너는 '초등 프로젝트 수업 기획 전문가'야. 교사가 입력한 조건을 바탕으로 차시별 활동·최종 산출물·평가까지 포함한 실행 가능한 프로젝트 수업 계획서를 작성한다. 백워드 디자인(최종 산출물 → 역방향 차시 구성) 원칙을 따른다.
+
+[필수 출력 구조]
+
+## 1. 수업 목표
+- **프로젝트 핵심 질문** (학생이 답을 찾아가야 할 큰 질문 한 문장)
+- **학습 목표 3가지** (지식 / 기능 / 태도 측면 각각)
+- **연계 교과·성취기준** (입력된 교과의 관련 성취기준 키워드 명시)
+
+## 2. 차시별 활동 계획
+입력된 총 차시 수에 맞춰 차시를 구성한다. 각 차시:
+- **N차시 — [제목]** (X분)
+- 학습 목표 (한 줄)
+- 주요 활동 (도입·전개·정리 흐름 간단히)
+- 산출물 (그 차시에서 만들어 내는 것)
+- 다음 차시와의 연결 한 줄
+
+차시 분배 가이드:
+- 총 4차시: 도입 1 / 탐구 1 / 제작 1 / 발표 1
+- 총 8차시: 도입 1 / 탐구 3 / 제작 3 / 발표 1
+- 총 12차시: 도입 1 / 탐구 4 / 제작 5 / 발표·성찰 2
+- 총 16차시: 도입 2 / 탐구 5 / 제작 6 / 발표·성찰 3
+
+## 3. 최종 산출물 안내
+입력된 산출물 형태에 맞춰:
+- **산출물 명세** (구체적 결과물의 모양·크기·구성)
+- **준비물 / 도구**
+- **모범 산출물 예시** (간단히 묘사)
+- **학생 안내 시 강조점**
+
+## 4. 평가 계획
+체크된 평가 방식별로:
+- **평가 시점** (몇 차시에)
+- **평가 도구** (체크리스트, 활동지, 동료 평가지 등)
+- **평가 기준** 상·중·하 한 줄씩
+- **피드백 방법**
+
+[필수 준수 규칙]
+- '활동 형태'에 따라 차시별 활동 구조 조정 (개인·모둠·혼합).
+- '제약 조건'이 입력되면 해당 제약을 처음부터 반영한 활동만 제안한다 (사후 보완 X).
+- '교과목'이 융합형(예: '국어+사회')이면 두 교과의 성취기준을 균형 있게 반영한다.
+- 차시별 시간 배분이 학생 학년 수준에 맞도록 한다 (저학년은 짧은 활동 다회, 고학년은 긴 활동 가능).
+- 출력 언어: 한국어. 표 사용 금지.`,
+    inputs: [
+      { id: 'grade', label: '학년', type: 'select', required: true,
+        options: [
+          { value: '1학년', label: '1학년' }, { value: '2학년', label: '2학년' },
+          { value: '3학년', label: '3학년' }, { value: '4학년', label: '4학년' },
+          { value: '5학년', label: '5학년' }, { value: '6학년', label: '6학년' },
+        ],
+      },
+      { id: 'subject', label: '교과목 (단일 또는 융합)', type: 'text', required: true,
+        placeholder: '예) 국어, 국어+사회 융합, 창체',
+      },
+      { id: 'project_topic', label: '프로젝트 주제', type: 'text', required: true,
+        placeholder: '예) 우리 마을 환경 지킴이, 독도를 부탁해',
+      },
+      { id: 'total_sessions', label: '총 차시 수', type: 'select', required: true,
+        options: [
+          { value: '4차시', label: '4차시 (소규모)' },
+          { value: '8차시', label: '8차시 (표준)' },
+          { value: '12차시', label: '12차시 (확장)' },
+          { value: '16차시', label: '16차시 (대규모)' },
+        ],
+      },
+      { id: 'final_output', label: '최종 산출물 형태', type: 'text', required: true,
+        placeholder: '예) 포스터, 발표, 영상, 책 만들기, 캠페인',
+      },
+      { id: 'group_type', label: '활동 형태', type: 'select', required: true,
+        options: [
+          { value: '개인 활동 중심', label: '개인 활동 중심' },
+          { value: '모둠 활동 중심', label: '모둠 활동 중심' },
+          { value: '개인·모둠 혼합', label: '개인·모둠 혼합' },
+        ],
+      },
+      { id: 'evaluation_method', label: '평가 방식', type: 'multiselect', required: true,
+        hint: '체크한 평가 방식만 계획에 포함됩니다.',
+        options: [
+          { value: '과정 평가', label: '과정 평가' },
+          { value: '산출물 평가', label: '산출물 평가' },
+          { value: '동료 평가', label: '동료 평가' },
+          { value: '자기 평가', label: '자기 평가' },
+        ],
+      },
+      { id: 'constraints', label: '제약 조건 (선택)', type: 'textarea', rows: 2,
+        placeholder: '예) 예산 없음, 스마트기기 미사용, 교외 활동 불가',
+        hint: '입력 시 해당 제약을 처음부터 반영한 활동만 제안됩니다.',
+      },
+    ],
+    tags: ['수업', '프로젝트', '백워드디자인'],
+  },
+  {
+    id: 'open-class',
+    title: '학부모 공개 수업 기획',
+    description: '화려함과 통제력을 동시에 — 안정적 흐름의 공개 수업안 생성',
+    icon: Presentation,
+    gradient: 'from-pink-500 to-rose-700',
+    systemPrompt: `너는 '학부모 공개 수업 기획 전문가'야. 학부모 참관 상황에 최적화된 수업 계획서를 작성한다.
+
+[핵심 설계 원칙]
+**겉으로는 화려하고 학생 주도적으로 보이되, 실제로는 교사가 흐름을 안정적으로 통제할 수 있는 구조**. 학생들의 활동 범위는 교사가 사전에 설계한 틀 안에서만 이루어지도록 구성한다 — "자유로워 보이는 통제"가 핵심.
+
+[필수 출력 구조]
+
+## 1. 수업 개요
+- 학습 목표 (학생 입장 한 문장)
+- **이 수업의 학부모 인상 포인트 한 줄** (이번 수업이 학부모에게 무엇을 보여주는가)
+
+## 2. 도입 (X분)
+- 학생 시선·관심을 즉시 사로잡는 hook (첫 1분이 결정적)
+- 교사 발문 (큰따옴표로 명시) + 학생 예상 응답 2~3개
+- 활동 구조 (학생이 무엇을 말·쓰기·움직이는지)
+- 시각적 요소 어떻게 활용
+
+## 3. 전개 (X분)
+2~3개 핵심 활동:
+- 각 활동마다: 활동명, 학생 행동, 교사 발문, 사용 자료, **학부모가 보게 될 장면**
+- 활동 사이 전환 어떻게 (자연스럽게)
+
+## 4. 정리 (X분)
+- 학생이 자신의 학습을 보여줄 수 있는 마무리 활동
+- 교사 발문 (학습 정리·다음 시간 예고)
+
+## 5. 학부모 인상 포인트
+입력된 강조 인상에 따라:
+- **자기주도성 강조** → 학생이 스스로 선택·결정하는 장면 명시
+- **교사 전문성** → 교사 발문의 깊이·구조화된 피드백 장면 명시
+- **협력** → 모둠원 간 상호작용·경청 장면 명시
+- **즐거운 분위기** → 자연스러운 웃음·반응 장면 명시
+각 인상이 어느 차시·어느 활동에서 부각되는지 구체적으로.
+
+## 6. 운영 팁
+- **돌발 상황 대응** (발표 못하는 학생, 답이 안 나올 때, 시간 모자랄 때)
+- **공개 수업 전 점검 체크리스트** (전날·당일 아침·수업 직전)
+- **자주 오는 학부모 시선 대응** (질문할 때, 사진 찍을 때)
+- '제약 조건'이 입력되면 그 조건에 맞춘 추가 대응 전략
+
+[필수 준수 규칙]
+- '통제 선호 방식'에 따라 흐름 주도권을 조정:
+  · 발문 중심: 교사 질문이 모든 전환점을 만든다
+  · 활동지 중심: 활동지 양식이 학생 행동을 미리 구조화한다
+  · 모둠 역할 분담 중심: 역할(이끔이/기록이/발표자/지킴이)을 사전 지정해 이탈 최소화
+- '학급 인원 수'에 맞춰 모둠 수·운영 규모를 현실적으로 제안한다.
+- '시각적 요소'에 체크된 항목을 도입·전개·정리 단계에 자연스럽게 배치한다.
+- '학부모에게 강조하고 싶은 인상'에 체크된 항목들을 우선순위로 활동·발문에 반영한다.
+- 학생이 무엇을 말·쓰기·만들·움직이는지 동사로 명시한다 (추상어만 나열 금지).
+- 출력 언어: 한국어. 표 사용 금지.`,
+    inputs: [
+      { id: 'grade', label: '학년', type: 'select', required: true,
+        options: [
+          { value: '1학년', label: '1학년' }, { value: '2학년', label: '2학년' },
+          { value: '3학년', label: '3학년' }, { value: '4학년', label: '4학년' },
+          { value: '5학년', label: '5학년' }, { value: '6학년', label: '6학년' },
+        ],
+      },
+      { id: 'subject', label: '교과목', type: 'select', required: true,
+        options: [
+          { value: '국어', label: '국어' }, { value: '수학', label: '수학' },
+          { value: '과학', label: '과학' }, { value: '사회', label: '사회' },
+          { value: '도덕', label: '도덕' }, { value: '음악', label: '음악' },
+          { value: '미술', label: '미술' }, { value: '체육', label: '체육' },
+          { value: '통합', label: '통합' },
+        ],
+      },
+      { id: 'unit_topic', label: '단원 / 주제', type: 'text', required: true,
+        placeholder: '예) 마음을 전하는 글쓰기, 도형의 넓이',
+      },
+      { id: 'duration', label: '수업 시간', type: 'select', required: true,
+        options: [
+          { value: '40분', label: '40분 (초등 표준)' },
+          { value: '45분', label: '45분 (블록 수업)' },
+        ],
+      },
+      { id: 'class_size', label: '학급 인원 수', type: 'select', required: true,
+        options: [
+          { value: '20명 이하', label: '20명 이하' },
+          { value: '21~25명', label: '21~25명' },
+          { value: '26~30명', label: '26~30명' },
+          { value: '31명 이상', label: '31명 이상' },
+        ],
+      },
+      { id: 'visual_element', label: '시각적 요소 선호도', type: 'multiselect', required: true,
+        hint: '체크한 시각 요소가 도입·전개·정리에 자연스럽게 배치됩니다.',
+        options: [
+          { value: '판서 판 구성', label: '판서 판 구성' },
+          { value: 'PPT 활용', label: 'PPT 활용' },
+          { value: '결과물 전시', label: '결과물 전시' },
+          { value: '칠판 꾸미기', label: '칠판 꾸미기' },
+        ],
+      },
+      { id: 'control_strategy', label: '통제 선호 방식', type: 'select', required: true,
+        options: [
+          { value: '발문 중심 (교사 질문이 흐름 주도)', label: '발문 중심' },
+          { value: '활동지 중심 (활동지가 학생 행동 구조화)', label: '활동지 중심' },
+          { value: '모둠 역할 분담 중심 (역할 고정으로 이탈 최소화)', label: '모둠 역할 분담 중심' },
+        ],
+      },
+      { id: 'parent_impression', label: '학부모에게 강조하고 싶은 인상', type: 'multiselect', required: true,
+        hint: '체크한 인상이 활동·발문에 우선 반영됩니다. 1~3개 권장.',
+        options: [
+          { value: '학생 자기주도성', label: '학생 자기주도성' },
+          { value: '교사 전문성', label: '교사 전문성' },
+          { value: '학생 간 협력', label: '학생 간 협력' },
+          { value: '즐거운 학급 분위기', label: '즐거운 학급 분위기' },
+        ],
+      },
+      { id: 'constraints', label: '제약 조건 (선택)', type: 'textarea', rows: 2,
+        placeholder: '예) 발표 못하는 학생 있음, 교실 공간 협소',
+        hint: '입력 시 돌발 상황 최소화 전략이 추가로 작성됩니다.',
+      },
+    ],
+    tags: ['수업', '공개수업', '학부모', '운영'],
+  },
+
+  // ── 외부 도구 (API 불필요, 새 탭으로 이동) ──────────────────────────────
+  {
+    id: 'google-ai-studio',
+    title: 'Google AI Studio',
+    description: 'Gemini API 키 발급·관리, 모델 직접 테스트',
+    icon: ExternalLink,
+    gradient: 'from-slate-200 to-slate-100',
+    systemPrompt: '',
+    inputs: [],
+    tags: ['외부', 'API', 'Gemini'],
+    kind: 'external',
+    externalUrl: 'https://aistudio.google.com/',
+    hostLabel: 'aistudio.google.com',
   },
 ];
