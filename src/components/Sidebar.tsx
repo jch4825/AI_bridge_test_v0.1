@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Home, BookOpen, Wrench, GraduationCap, CheckCircle2, Key, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Home, BookOpen, Wrench, GraduationCap, CheckCircle2, Key, X, LogOut } from 'lucide-react';
 import { ViewType, Module } from '../types';
 import { modules, lessons } from '../data/tutorialData';
 import { motion } from 'motion/react';
@@ -17,20 +17,55 @@ interface SidebarProps {
 export default function Sidebar({ currentView, onViewChange, selectedModule, onSelectModule, completedLessons, isOpen, onClose }: SidebarProps) {
   const [showApiModal, setShowApiModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showExitModal, setShowExitModal] = useState(false);
   
-  const hasApiKey = (() => {
+  // localStorage 변경을 즉시 UI에 반영하기 위해 state로 관리
+  const [hasApiKey, setHasApiKey] = useState(() => {
     const key = localStorage.getItem('gemini-api-key');
     return !!(key && key.length > 10);
-  })();
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      const key = localStorage.getItem('gemini-api-key');
+      setHasApiKey(!!(key && key.length > 10));
+    };
+    // 다른 탭에서 변경될 때 (storage 이벤트는 동일 탭에서는 안 발생)
+    window.addEventListener('storage', refresh);
+    // 동일 탭 안에서 1-4 레슨이나 다른 곳에서 키를 바꿨을 때
+    window.addEventListener('api-key-changed', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('api-key-changed', refresh);
+    };
+  }, []);
 
   const saveApiKey = () => {
-    if (apiKeyInput.trim().length > 10) {
-      localStorage.setItem('gemini-api-key', apiKeyInput.trim());
-      setShowApiModal(false);
-      setApiKeyInput('');
-      window.location.reload();
+    // 내부 공백·줄바꿈·탭까지 모두 제거 (복사 과정에서 끼어드는 문자 차단)
+    const cleaned = apiKeyInput.replace(/\s+/g, '');
+
+    // Google Gemini API 키는 "AIza"로 시작하고 보통 39자
+    if (!cleaned.startsWith('AIza') || cleaned.length < 30) {
+      alert(
+        '올바른 형식의 Gemini API 키가 아닙니다.\n\n' +
+        'Google AI Studio에서 발급한 키는 "AIza"로 시작하며 약 39자입니다.\n' +
+        '키 앞뒤에 공백이나 따옴표가 섞이지 않았는지 확인해 주세요.'
+      );
+      return;
     }
+
+    localStorage.setItem('gemini-api-key', cleaned);
+    window.dispatchEvent(new Event('api-key-changed'));
+    setShowApiModal(false);
+    setApiKeyInput('');
+    window.location.reload();
   };
+
+  // 저장 버튼 활성화 조건 (saveApiKey와 동일 기준)
+  const isApiKeyValid = (() => {
+    const cleaned = apiKeyInput.replace(/\s+/g, '');
+    return cleaned.startsWith('AIza') && cleaned.length >= 30;
+  })();
 
   const totalLessons = lessons.length;
   const completedCount = completedLessons.filter(id => lessons.some(l => l.id === id)).length;
@@ -125,6 +160,15 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
           <Key size={16} />
           {hasApiKey ? 'API 연결됨' : 'API 키 등록'}
         </button>
+        {hasApiKey && (
+          <button
+            onClick={() => setShowExitModal(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors w-full"
+          >
+            <LogOut size={16} />
+            나가기
+          </button>
+        )}
         <div className="bg-canva-bg rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold text-canva-gray uppercase tracking-wider">학습 진도</span>
@@ -139,6 +183,60 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
         </p>
       </div>
       </aside>
+
+      {showExitModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                <LogOut size={20} className="text-red-500" />
+              </div>
+              <h3 className="font-bold text-base text-canva-ink">나가기 전에 확인해 주세요</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">
+              공용 PC에서 사용 중이라면 저장된 <span className="font-bold text-red-600">API 키를 삭제</span>하고 나가세요.
+            </p>
+            <p className="text-xs text-gray-400 mb-6">
+              개인 PC라면 '삭제 없이 나가기'를 눌러도 됩니다.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  localStorage.removeItem('gemini-api-key');
+                  window.dispatchEvent(new Event('api-key-changed'));
+                  setShowExitModal(false);
+                  window.close();
+                  // window.close() may be blocked; show a friendly fallback
+                  setTimeout(() => {
+                    alert('API 키가 삭제되었습니다.\n브라우저 탭을 직접 닫아주세요.');
+                  }, 300);
+                }}
+                className="w-full py-3 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-colors"
+              >
+                API 키 삭제 후 나가기
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitModal(false);
+                  window.close();
+                  setTimeout(() => {
+                    alert('브라우저 탭을 직접 닫아주세요.');
+                  }, 300);
+                }}
+                className="w-full py-2.5 border border-gray-200 text-gray-600 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors"
+              >
+                삭제 없이 나가기
+              </button>
+              <button
+                onClick={() => setShowExitModal(false)}
+                className="w-full py-2 text-gray-400 text-sm hover:text-gray-600 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showApiModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
@@ -167,14 +265,22 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
               type="password"
               value={apiKeyInput}
               onChange={e => setApiKeyInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && saveApiKey()}
+              onKeyDown={e => e.key === 'Enter' && isApiKeyValid && saveApiKey()}
               placeholder="AIza..."
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm font-mono mb-4 focus:outline-none focus:ring-2 focus:ring-canva-purple/30"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              name="gemini-api-key-input"
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm font-mono mb-2 focus:outline-none focus:ring-2 focus:ring-canva-purple/30"
               autoFocus
             />
+            <p className="text-[11px] text-gray-400 mb-4">
+              "AIza"로 시작하는 약 39자의 키입니다. 앞뒤 공백·따옴표가 섞이지 않도록 주의하세요.
+            </p>
             <button
               onClick={saveApiKey}
-              disabled={apiKeyInput.trim().length <= 10}
+              disabled={!isApiKeyValid}
               className="w-full py-3 bg-canva-purple text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-opacity mb-3"
             >
               저장하기
@@ -189,6 +295,7 @@ export default function Sidebar({ currentView, onViewChange, selectedModule, onS
                     onClick={() => {
                       if (window.confirm('저장된 API 키를 삭제하시겠습니까?\n브라우저에서 완전히 제거됩니다.')) {
                         localStorage.removeItem('gemini-api-key');
+                        window.dispatchEvent(new Event('api-key-changed'));
                         setShowApiModal(false);
                         window.location.reload();
                       }

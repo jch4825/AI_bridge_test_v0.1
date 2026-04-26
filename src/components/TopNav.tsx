@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Home, BookOpen, GraduationCap, Key, X } from 'lucide-react';
 import { ViewType } from '../types';
 
@@ -10,18 +10,38 @@ interface TopNavProps {
 export default function TopNav({ currentView, onViewChange }: TopNavProps) {
   const [showApiModal, setShowApiModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
-  const hasApiKey = (() => {
+  const [hasApiKey, setHasApiKey] = useState(() => {
     const key = localStorage.getItem('gemini-api-key');
     return !!(key && key.length > 10);
-  })();
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      const key = localStorage.getItem('gemini-api-key');
+      setHasApiKey(!!(key && key.length > 10));
+    };
+    window.addEventListener('storage', refresh);
+    window.addEventListener('api-key-changed', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('api-key-changed', refresh);
+    };
+  }, []);
 
   const saveApiKey = () => {
-    if (apiKeyInput.trim().length > 10) {
-      localStorage.setItem('gemini-api-key', apiKeyInput.trim());
-      setShowApiModal(false);
-      setApiKeyInput('');
-      window.location.reload();
+    const cleaned = apiKeyInput.replace(/\s+/g, '');
+    if (!cleaned.startsWith('AIza') || cleaned.length < 30) {
+      alert(
+        '올바른 형식의 Gemini API 키가 아닙니다.\n\n' +
+        'Google AI Studio에서 발급한 키는 "AIza"로 시작하며 약 39자입니다.'
+      );
+      return;
     }
+    localStorage.setItem('gemini-api-key', cleaned);
+    window.dispatchEvent(new Event('api-key-changed'));
+    setShowApiModal(false);
+    setApiKeyInput('');
+    window.location.reload();
   };
 
   const navItems = [
@@ -113,6 +133,7 @@ export default function TopNav({ currentView, onViewChange }: TopNavProps) {
                     onClick={() => {
                       if (window.confirm('저장된 API 키를 삭제하시겠습니까?\n브라우저에서 완전히 제거됩니다.')) {
                         localStorage.removeItem('gemini-api-key');
+                        window.dispatchEvent(new Event('api-key-changed'));
                         setShowApiModal(false);
                         window.location.reload();
                       }

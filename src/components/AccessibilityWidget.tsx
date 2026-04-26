@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Type, GripVertical } from 'lucide-react';
+import { Type, GripVertical, X } from 'lucide-react';
 import { FontScale, applyFontScale, loadFontScale } from '../utils/a11y';
 
 type Pos = { x: number; y: number };
 
 const POS_KEY = 'ai-bridge-widget-pos';
+const COLLAPSED_KEY = 'ai-bridge-widget-collapsed';
 
 function loadPos(): Pos | null {
   try {
@@ -29,8 +30,16 @@ export default function AccessibilityWidget() {
   const [scale, setScale] = useState<FontScale>(() => loadFontScale());
   const [pos, setPos] = useState<Pos | null>(() => loadPos());
   const [dragging, setDragging] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(COLLAPSED_KEY) === 'true'; } catch { return false; }
+  });
   const ref = useRef<HTMLDivElement>(null);
   const dragStart = useRef<{ pointerX: number; pointerY: number; x: number; y: number } | null>(null);
+
+  const toggleCollapsed = (next: boolean) => {
+    setCollapsed(next);
+    try { localStorage.setItem(COLLAPSED_KEY, String(next)); } catch {}
+  };
 
   useEffect(() => {
     applyFontScale(scale);
@@ -109,11 +118,26 @@ export default function AccessibilityWidget() {
     touchAction: 'none' // Prevent scrolling while dragging on mobile
   };
 
+  if (collapsed) {
+    return (
+      <button
+        ref={ref as React.RefObject<HTMLButtonElement>}
+        style={style}
+        onClick={() => toggleCollapsed(false)}
+        aria-label="글자 크기 위젯 열기"
+        title="글자 크기 위젯 열기"
+        className="fixed z-[100] bg-white border border-gray-200 rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-gray-400 hover:text-canva-purple hover:border-canva-purple transition-colors"
+      >
+        <Type size={16} />
+      </button>
+    );
+  }
+
   return (
     <div
       ref={ref}
       style={style}
-      className={`fixed z-[100] bg-white border border-gray-200 rounded-full shadow-lg pl-1 pr-3 py-2 flex items-center gap-2 select-none ${
+      className={`fixed z-[100] bg-white border border-gray-200 rounded-full shadow-lg pl-1 pr-2 py-2 flex items-center gap-2 select-none ${
         dragging ? 'cursor-grabbing shadow-2xl' : ''
       }`}
     >
@@ -146,6 +170,14 @@ export default function AccessibilityWidget() {
           </button>
         ))}
       </div>
+      <button
+        onClick={() => toggleCollapsed(true)}
+        aria-label="위젯 닫기"
+        title="위젯 닫기"
+        className="flex items-center px-1.5 py-1.5 rounded-full text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+      >
+        <X size={14} />
+      </button>
     </div>
   );
 }
