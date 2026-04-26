@@ -80,3 +80,29 @@
     @apply text-gray-100;
   }
 }
+
+/* "다음에 누를 버튼" 강조용 글로우 (시뮬레이션 단계 안내) */
+@keyframes highlight-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px var(--hl, rgba(139, 61, 255, 0.45)),
+      0 0 10px 2px var(--hl, rgba(139, 61, 255, 0.40));
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px var(--hl-strong, rgba(139, 61, 255, 0.85)),
+      0 0 22px 6px var(--hl-strong, rgba(139, 61, 255, 0.65));
+  }
+}
+
+.btn-highlight {
+  animation: highlight-glow 1.6s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+/* Teal 변형 (스킬 탭처럼 teal 계열 강조 버튼용) */
+.btn-highlight-teal {
+  --hl: rgba(0, 196, 204, 0.45);
+  --hl-strong: rgba(0, 196, 204, 0.85);
+}

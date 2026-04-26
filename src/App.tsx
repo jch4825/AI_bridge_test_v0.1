@@ -5,6 +5,7 @@ import AccessibilityWidget from './components/AccessibilityWidget';
 import Home from './views/Home';
 import Tutorial from './views/Tutorial';
 import QuickTools from './views/QuickTools';
+import Resources from './views/Resources';
 import { ViewType, Module } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -53,12 +54,7 @@ export default function App() {
       case 'home':
         return <Home onViewChange={setCurrentView} />;
       case 'resources':
-        return (
-          <div className="p-12 text-center">
-            <h2 className="text-3xl font-bold mb-4">자료실</h2>
-            <p className="text-gray-500">준비 중인 페이지입니다.</p>
-          </div>
-        );
+        return <Resources />;
       case 'tools':
         return <QuickTools />;
       case 'tutorial':
