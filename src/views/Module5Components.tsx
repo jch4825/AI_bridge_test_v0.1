@@ -927,159 +927,206 @@ export const Lesson55Interactive = ({ onRun, setUserInput, onNavigateToLesson }:
 };
 
 // 5-6: 가이드라인 빌더
+type GuidelineCategory = {
+  key: string;
+  label: string;
+  emoji: string;
+  options: string[];
+};
+
+const GUIDELINE_CATEGORIES: GuidelineCategory[] = [
+  {
+    key: 'hallucination',
+    label: '할루시네이션 대응',
+    emoji: '🔍',
+    options: [
+      'AI 결과물의 핵심 사실은 반드시 교차 검증한다',
+      '수치·날짜·법령이 포함된 내용은 출처를 요청한다',
+      '중요 문서는 RAG 방식(자료 먼저 제공)으로 요청한다',
+      '인용·통계는 1차 출처를 직접 확인한 뒤 사용한다',
+      '"확실하지 않으면 모른다고 답해"라는 지시를 프롬프트에 포함한다',
+      '동일한 질문을 다르게 표현해 두 번 이상 확인한다',
+      '학생에게 보여주기 전 모든 사실을 한 번 더 점검한다',
+    ],
+  },
+  {
+    key: 'privacy',
+    label: '데이터 프라이버시',
+    emoji: '🔒',
+    options: [
+      '학생 이름·학번·주민번호는 AI에 입력하지 않는다',
+      '학부모 연락처·주소·계좌 정보는 AI에 입력하지 않는다',
+      '교사 인사·호봉·평정 정보는 AI에 입력하지 않는다',
+      '학생 진단·상담·심리 검사 결과는 AI에 입력하지 않는다',
+      'AI 입력 전 익명화·일반화를 기본 절차로 삼는다',
+      '학생 사례는 "초등 4학년 남학생" 식의 익명 표현으로 변환한다',
+      '학교 내부 문서를 외부 AI에 그대로 붙여넣지 않는다',
+      '의심스러우면 교육청 개인정보보호 담당자에게 먼저 문의한다',
+    ],
+  },
+  {
+    key: 'copyright',
+    label: '저작권·출처',
+    emoji: '©️',
+    options: [
+      '수업 자료에 AI 생성물을 사용할 때 출처를 명시한다 ("AI 생성물 / 검토: 본인")',
+      '학생에게도 AI 사용 시 출처 표기를 요구한다',
+      'AI 생성물을 상업적으로 판매·배포하지 않는다',
+      'AI가 만든 이미지·음악도 동일한 출처 표기 원칙을 적용한다',
+      '타인의 저작물을 AI에 학습용으로 그대로 입력하지 않는다',
+      'AI 생성물의 저작권 귀속이 불분명할 때는 사용을 보류한다',
+      '학교 공식 문서·홍보물에는 AI 생성물 비율을 별도 명시한다',
+    ],
+  },
+  {
+    key: 'aiSlop',
+    label: 'AI Slop 방지 (검토·정리)',
+    emoji: '✋',
+    options: [
+      '다른 사람에게 보내기 전 처음부터 끝까지 직접 읽는다',
+      'AI 초안을 그대로 복사·전송하지 않는다 — 최소 한 번 다듬는다',
+      'AI 특유의 일반론·미사여구를 의도적으로 덜어낸다',
+      '받는 사람이 끝까지 읽을 분량으로 줄인다',
+      '내 목소리·내 흔적이 남도록 표현을 손본다',
+      '만드는 데 1분 걸렸으면 검토에 5분을 쓴다',
+      '"이 글은 누가 썼다"는 흔적이 남는지 자문한다',
+    ],
+  },
+  {
+    key: 'studentEducation',
+    label: '학생 교육',
+    emoji: '🎓',
+    options: [
+      '학기 초 AI 사용 규칙을 학급 단위로 함께 정한다',
+      'AI에게 의존하지 않고 스스로 사고하는 시간을 확보한다',
+      'AI 결과물의 오류를 찾아 수정하는 활동을 정기적으로 진행한다',
+      '학생이 AI에 입력해도 되는 정보·안 되는 정보를 명확히 구분해 안내한다',
+      'AI 결과물 제출 시 본인이 검토·수정한 흔적을 함께 제출하게 한다',
+      '평가 과제에서 AI 사용 허용 범위를 사전에 명시한다',
+      'AI 윤리 사례를 수업 중 정기적으로 토론한다',
+    ],
+  },
+  {
+    key: 'classroomRules',
+    label: '학급 운영 규칙',
+    emoji: '📋',
+    options: [
+      'AI 사용 가능 과제와 사용 금지 과제를 명확히 구분한다',
+      '제출물에는 "AI 사용 여부 / 검토자" 칸을 추가한다',
+      'AI 결과물 검토 절차를 학생과 공유한다',
+      '학급 단위 AI 사용 일지를 운영한다',
+      '연 2회 이상 가이드라인을 함께 검토·수정한다',
+      '의심 사례는 학급 회의에서 함께 다룬다',
+    ],
+  },
+];
+
 export const Lesson56Interactive = () => {
-  const [hallucinationChecks, setHallucinationChecks] = useState<string[]>([]);
-  const [privacyChecks, setPrivacyChecks] = useState<string[]>([]);
-  const [copyrightChecks, setCopyrightChecks] = useState<string[]>([]);
+  const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
   const [generated, setGenerated] = useState('');
 
-  const options = {
-    hallucination: [
-      'AI 결과물의 핵심 사실은 반드시 교차 검증한다',
-      '수치·날짜·법령이 포함된 내용은 출처를 요청한다',
-      '중요 문서는 RAG 방식(자료 먼저 제공)으로 요청한다'
-    ],
-    privacy: [
-      '학생 이름·학번은 AI에 입력하지 않는다',
-      '학부모 연락처·개인 정보는 AI에 입력하지 않는다',
-      'AI 입력 전 익명화를 기본으로 한다'
-    ],
-    copyright: [
-      '수업 자료에 AI 생성물을 사용할 때 출처를 표기한다',
-      '학생에게 AI 사용 출처 표기를 요구한다',
-      'AI 생성물을 상업적으로 사용하지 않는다'
-    ]
+  const toggleCheck = (catKey: string, item: string) => {
+    setSelected(prev => {
+      const arr = prev[catKey] || [];
+      return {
+        ...prev,
+        [catKey]: arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item],
+      };
+    });
   };
 
+  const totalSelected = Object.values(selected).reduce((sum, arr) => sum + arr.length, 0)
+    + Object.values(customInputs).filter(v => v?.trim()).length;
+
   const handleGenerateGuideline = () => {
+    const sections = GUIDELINE_CATEGORIES.map(cat => {
+      const items = selected[cat.key] || [];
+      const custom = customInputs[cat.key]?.trim();
+      const lines = [`[${cat.label} 원칙]`];
+      if (items.length === 0 && !custom) {
+        lines.push('(선택된 항목 없음)');
+      } else {
+        items.forEach((item, i) => lines.push(`${i + 1}. ${item}`));
+        if (custom) lines.push(`${items.length + 1}. ${custom}`);
+      }
+      return lines.join('\n');
+    });
+
     const guideline = `○○초등학교 ○학년 ○반 AI 윤리 가이드라인
 
-[할루시네이션 대응 원칙]
-${hallucinationChecks.length > 0
-  ? hallucinationChecks.map((check, i) => `${i + 1}. ${check}`).join('\n')
-  : '(선택된 항목 없음)'}
-${customInputs.hallucination ? `\n추가: ${customInputs.hallucination}` : ''}
-
-[데이터 프라이버시 원칙]
-${privacyChecks.length > 0
-  ? privacyChecks.map((check, i) => `${i + 1}. ${check}`).join('\n')
-  : '(선택된 항목 없음)'}
-${customInputs.privacy ? `\n추가: ${customInputs.privacy}` : ''}
-
-[저작권·출처 원칙]
-${copyrightChecks.length > 0
-  ? copyrightChecks.map((check, i) => `${i + 1}. ${check}`).join('\n')
-  : '(선택된 항목 없음)'}
-${customInputs.copyright ? `\n추가: ${customInputs.copyright}` : ''}
+${sections.join('\n\n')}
 
 작성일: _________ / 담임: _________`;
 
     setGenerated(guideline);
   };
 
-  const toggleCheck = (type: 'hallucination' | 'privacy' | 'copyright', item: string) => {
-    if (type === 'hallucination') {
-      setHallucinationChecks(prev =>
-        prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
-      );
-    } else if (type === 'privacy') {
-      setPrivacyChecks(prev =>
-        prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
-      );
-    } else {
-      setCopyrightChecks(prev =>
-        prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
-      );
-    }
-  };
-
   return (
     <div className="flex-1 bg-[#0e1318] rounded-xl p-5 border border-gray-800 flex flex-col gap-4 overflow-y-auto">
-      <div className="text-white font-bold mb-2">나만의 AI 윤리 가이드라인 빌더</div>
+      <div className="flex items-center justify-between">
+        <div className="text-white font-bold">나만의 AI 윤리 가이드라인 빌더</div>
+        {!generated && (
+          <div className="text-[10px] text-gray-400 font-mono">
+            선택 <span className="text-canva-teal font-bold">{totalSelected}</span>개
+          </div>
+        )}
+      </div>
 
       {!generated ? (
-        <div className="space-y-4">
-          {/* 할루시네이션 */}
-          <div className="bg-gray-900 p-4 rounded-lg">
-            <div className="font-bold text-white mb-3 text-sm">할루시네이션 대응 원칙</div>
-            <div className="space-y-2">
-              {options.hallucination.map((option, idx) => (
-                <label key={idx} className="flex items-start gap-2 cursor-pointer">
+        <div className="space-y-3">
+          {GUIDELINE_CATEGORIES.map(cat => {
+            const catSelected = selected[cat.key] || [];
+            return (
+              <div key={cat.key} className="bg-gray-900 p-4 rounded-lg border border-gray-800">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-bold text-white text-sm flex items-center gap-2">
+                    <span>{cat.emoji}</span> {cat.label}
+                  </div>
+                  {catSelected.length > 0 && (
+                    <span className="text-[10px] font-bold text-canva-teal bg-canva-teal/15 border border-canva-teal/40 px-2 py-0.5 rounded-full">
+                      {catSelected.length}개 선택
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {cat.options.map((option, idx) => {
+                    const checked = catSelected.includes(option);
+                    return (
+                      <label
+                        key={idx}
+                        className={`flex items-start gap-2 cursor-pointer p-1.5 rounded transition-colors ${
+                          checked ? 'bg-canva-teal/10' : 'hover:bg-gray-800/60'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCheck(cat.key, option)}
+                          className="mt-1 accent-canva-teal"
+                        />
+                        <span className={`text-[12px] leading-relaxed ${checked ? 'text-canva-teal' : 'text-gray-300'}`}>{option}</span>
+                      </label>
+                    );
+                  })}
                   <input
-                    type="checkbox"
-                    checked={hallucinationChecks.includes(option)}
-                    onChange={() => toggleCheck('hallucination', option)}
-                    className="mt-1"
+                    type="text"
+                    placeholder="직접 추가하고 싶은 원칙..."
+                    value={customInputs[cat.key] || ''}
+                    onChange={e => setCustomInputs({ ...customInputs, [cat.key]: e.target.value })}
+                    className="w-full mt-2 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-[12px] text-white placeholder-gray-500 focus:outline-none focus:border-canva-teal/60"
                   />
-                  <span className="text-sm text-gray-300">{option}</span>
-                </label>
-              ))}
-              <input
-                type="text"
-                placeholder="추가 입력..."
-                value={customInputs.hallucination || ''}
-                onChange={e => setCustomInputs({...customInputs, hallucination: e.target.value})}
-                className="w-full mt-2 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* 프라이버시 */}
-          <div className="bg-gray-900 p-4 rounded-lg">
-            <div className="font-bold text-white mb-3 text-sm">데이터 프라이버시 원칙</div>
-            <div className="space-y-2">
-              {options.privacy.map((option, idx) => (
-                <label key={idx} className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={privacyChecks.includes(option)}
-                    onChange={() => toggleCheck('privacy', option)}
-                    className="mt-1"
-                  />
-                  <span className="text-sm text-gray-300">{option}</span>
-                </label>
-              ))}
-              <input
-                type="text"
-                placeholder="추가 입력..."
-                value={customInputs.privacy || ''}
-                onChange={e => setCustomInputs({...customInputs, privacy: e.target.value})}
-                className="w-full mt-2 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* 저작권 */}
-          <div className="bg-gray-900 p-4 rounded-lg">
-            <div className="font-bold text-white mb-3 text-sm">저작권·출처 원칙</div>
-            <div className="space-y-2">
-              {options.copyright.map((option, idx) => (
-                <label key={idx} className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={copyrightChecks.includes(option)}
-                    onChange={() => toggleCheck('copyright', option)}
-                    className="mt-1"
-                  />
-                  <span className="text-sm text-gray-300">{option}</span>
-                </label>
-              ))}
-              <input
-                type="text"
-                placeholder="추가 입력..."
-                value={customInputs.copyright || ''}
-                onChange={e => setCustomInputs({...customInputs, copyright: e.target.value})}
-                className="w-full mt-2 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none"
-              />
-            </div>
-          </div>
+                </div>
+              </div>
+            );
+          })}
 
           <button
             onClick={handleGenerateGuideline}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg py-2 px-3 text-sm font-medium transition-colors"
+            disabled={totalSelected === 0}
+            className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg py-3 px-3 text-sm font-bold transition-colors"
           >
-            가이드라인 문서 생성
+            {totalSelected === 0 ? '항목을 1개 이상 선택해 주세요' : `가이드라인 문서 생성 (${totalSelected}개 항목)`}
           </button>
         </div>
       ) : (
@@ -1087,7 +1134,7 @@ ${customInputs.copyright ? `\n추가: ${customInputs.copyright}` : ''}
           <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-sm text-green-100">
             ✓ 나만의 AI 윤리 가이드라인이 완성되었습니다!
           </div>
-          <pre className="bg-gray-900 p-4 rounded-lg text-xs text-gray-300 overflow-x-auto border border-gray-800">
+          <pre className="bg-gray-900 p-4 rounded-lg text-xs text-gray-300 overflow-x-auto border border-gray-800 whitespace-pre-wrap">
             {generated}
           </pre>
           <div className="flex gap-2">
@@ -1100,6 +1147,201 @@ ${customInputs.copyright ? `\n추가: ${customInputs.copyright}` : ''}
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+};
+
+// 5-7: AI Slop vs 검토된 결과물 비교
+type SlopCase = {
+  scenario: string;
+  context: string;
+  slop: string;
+  reviewed: string;
+  changes: string[];
+};
+
+const SLOP_CASES: SlopCase[] = [
+  {
+    scenario: "가정통신문",
+    context: "5월 가정의 달 행사 안내 — AI에게 '5월 행사 가정통신문 써줘'만 입력한 결과",
+    slop: `존경하는 학부모님께,
+
+따뜻한 햇살이 비추는 5월을 맞이하여 학부모님 가정에 평안과 행복이 가득하시기를 진심으로 기원합니다. 우리 학교에서는 5월을 맞이하여 다양한 행사를 준비하고 있으며, 이는 학생들에게 의미 있는 경험을 제공할 수 있는 소중한 기회가 될 것입니다.
+
+먼저, 가정의 달을 기념하여 다양한 활동들이 진행될 예정이며, 학생들의 적극적인 참여와 학부모님의 따뜻한 관심을 부탁드립니다. 자세한 사항은 추후 안내드리도록 하겠습니다.
+
+항상 우리 학교에 보내주시는 사랑과 관심에 깊이 감사드립니다.`,
+    reviewed: `학부모님께,
+
+5월 가정의 달을 맞아 우리 반에서는 두 가지 활동을 진행합니다.
+
+1. **부모님께 편지 쓰기 (5월 8일, 1교시)** — 평소 표현하기 어려운 마음을 글로 정리해 봅니다. 완성된 편지는 가정에서 직접 전달하도록 안내합니다.
+2. **가족 사진 전시회 (5월 15일까지 사진 제출)** — A4 한 장에 가족 사진과 짧은 소개글을 붙여 5월 16일~20일 교실 뒤편에 전시합니다.
+
+사진은 학급 외부에 공개되지 않으며, 행사 종료 후 즉시 가정으로 돌려드립니다.
+
+문의: 4학년 2반 담임 김OO (학교 대표번호 02-XXXX-XXXX)`,
+    changes: [
+      "❌ 미사여구만 가득한 인사말 → ✅ 무엇을 언제 어떻게 하는지 즉시 명시",
+      "❌ '다양한 행사' 같은 모호한 표현 → ✅ 행사명·날짜·교시 구체화",
+      "❌ '추후 안내' 회피 → ✅ 사진 처리·문의처까지 한 번에",
+      "❌ 누가 보냈는지 알 수 없음 → ✅ 담임 이름·연락처 명기",
+    ],
+  },
+  {
+    scenario: "생기부 문구",
+    context: "한 학생에 대해 AI에게 '활발한 학생 생기부 문구 써줘'만 입력한 결과",
+    slop: `매사에 적극적이고 긍정적인 자세로 학교 생활에 임하며, 친구들과 원만한 관계를 형성하고 있음. 다양한 활동에 열정적으로 참여하며, 자신의 의견을 적극적으로 표현하는 모습을 보임. 학습에 있어서도 성실한 태도를 보이며, 꾸준한 노력으로 좋은 결과를 만들어 가고 있음. 앞으로의 성장이 더욱 기대되는 학생임.`,
+    reviewed: `5월 과학 '식물의 한살이' 관찰 활동에서 강낭콩 발아 과정을 매일 자율적으로 기록하여 14일치 관찰 일지를 완성함. 본인의 관찰을 바탕으로 모둠 발표 시 "물 주는 시간이 늦으면 잎이 처지는 정도"를 직접 그래프로 정리해 발표하여 친구들의 후속 질문을 이끌어 냄. 모둠 활동에서 의견이 갈릴 때 상대 의견을 끝까지 듣고 자신의 근거를 차분히 제시하는 태도가 돋보임.`,
+    changes: [
+      "❌ 누구에게나 해당될 수 있는 일반론 → ✅ 구체적 활동·날짜·산출물 명기",
+      "❌ '적극적', '성실', '원만' 같은 추상어 나열 → ✅ 관찰된 행동 한 가지를 자세히",
+      "❌ 결과가 보이지 않음 → ✅ 관찰 일지 14일·그래프·발표 같은 결과물 제시",
+      "❌ 학생을 구분할 수 없음 → ✅ 이 학생만의 장면이 보임",
+    ],
+  },
+  {
+    scenario: "학습지",
+    context: "AI에게 '4학년 사회 학습지 만들어줘'만 입력한 결과",
+    slop: `1. 우리나라의 수도는 어디인가?
+2. 사회는 무엇인가?
+3. 사람들은 왜 함께 살아가는가?
+4. 우리 지역의 특징을 설명하시오.
+5. 가족의 의미는 무엇인가?
+6. 학교에서 지켜야 할 규칙은?
+7. 환경 보호는 왜 중요한가?
+8. 우리나라의 자랑스러운 점은?
+9. 사회 구성원으로서의 역할은?
+10. 미래 사회는 어떻게 변할까?`,
+    reviewed: `**4학년 사회 — 우리 지역의 환경 (단원 2-1)**
+
+지난 시간 배운 '지역의 자연환경 vs 인문환경' 분류를 떠올리며 풀어 보세요.
+
+**1.** 다음 중 '자연환경'에 속하는 것을 모두 고르세요. ( )
+   ① 한강   ② 시청   ③ 남산   ④ 지하철   ⑤ 평야
+
+**2.** 우리 지역(서울 OO구)의 자연환경 한 가지를 떠올리고, 그것이 우리 생활에 어떤 영향을 주는지 한 문장으로 쓰세요.
+   → ________________________________________________
+
+**3.** 같은 지역이라도 100년 전과 지금의 인문환경은 어떻게 달라졌을까요? 한 가지만 예를 들어 설명해 보세요.
+   → ________________________________________________`,
+    changes: [
+      "❌ 단원·차시 무관한 일반 질문 → ✅ '단원 2-1, 자연·인문환경 분류'로 학습 맥락 연결",
+      "❌ 답이 없거나 모호한 질문 → ✅ 객관식·서술형 형식과 답 칸 명시",
+      "❌ 우리 지역과 무관 → ✅ '서울 OO구' 같은 우리 학급 맥락 반영",
+      "❌ 모든 학생이 같은 답 → ✅ 자기 경험으로 답하는 개방형 질문",
+    ],
+  },
+];
+
+export const Lesson57Interactive = () => {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [showReviewed, setShowReviewed] = useState(false);
+  const [selfChecked, setSelfChecked] = useState<string[]>([]);
+  const current = SLOP_CASES[activeIdx];
+
+  const checks = [
+    "사실관계(이름·날짜·수치·인용)를 직접 확인했다",
+    "이 학급·학생·상황에 맞는 표현인지 다듬었다",
+    "받는 사람이 끝까지 읽을 만한 길이로 줄였다",
+    "AI 특유의 일반론·미사여구를 덜어냈다",
+    "내 목소리·내 흔적이 남도록 정리했다",
+  ];
+
+  const toggleCheck = (item: string) => {
+    setSelfChecked(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
+  };
+
+  return (
+    <div className="space-y-4 text-gray-100">
+      {/* 시나리오 선택 */}
+      <div>
+        <div className="text-xs text-gray-400 mb-2">사례 선택</div>
+        <div className="flex flex-wrap gap-2">
+          {SLOP_CASES.map((c, i) => (
+            <button
+              key={i}
+              onClick={() => { setActiveIdx(i); setShowReviewed(false); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                i === activeIdx
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
+                  : 'bg-gray-800/40 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200'
+              }`}
+            >
+              {c.scenario}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 컨텍스트 */}
+      <div className="text-[11px] text-gray-400 italic px-1">{current.context}</div>
+
+      {/* AI Slop 결과물 */}
+      <div className="bg-rose-500/5 border border-rose-500/30 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-rose-400 font-bold text-xs">⚠️ AI Slop — 검토 없는 그대로</span>
+        </div>
+        <pre className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed font-sans">{current.slop}</pre>
+      </div>
+
+      {!showReviewed ? (
+        <button
+          onClick={() => setShowReviewed(true)}
+          className="w-full py-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/40 text-emerald-200 font-bold text-sm transition-colors"
+        >
+          ✋ 5분간 검토·정리한 결과 보기
+        </button>
+      ) : (
+        <>
+          {/* 검토된 결과물 */}
+          <div className="bg-emerald-500/5 border border-emerald-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-emerald-400 font-bold text-xs">✅ 5분 검토 후 — 다듬어 보낸 글</span>
+            </div>
+            <pre className="text-xs text-gray-200 whitespace-pre-wrap leading-relaxed font-sans">{current.reviewed}</pre>
+          </div>
+
+          {/* 무엇이 달라졌나 */}
+          <div className="bg-gray-800/40 border border-gray-700 rounded-xl p-4">
+            <div className="text-xs font-bold text-gray-300 mb-2">달라진 점</div>
+            <ul className="space-y-1.5">
+              {current.changes.map((c, i) => (
+                <li key={i} className="text-[11px] text-gray-300 leading-relaxed">{c}</li>
+              ))}
+            </ul>
+          </div>
+
+          {/* 자가 점검 체크리스트 */}
+          <div className="bg-amber-500/5 border border-amber-500/30 rounded-xl p-4">
+            <div className="text-xs font-bold text-amber-300 mb-3">📋 보내기 전 나의 자가 점검</div>
+            <div className="space-y-2">
+              {checks.map((c, i) => {
+                const checked = selfChecked.includes(c);
+                return (
+                  <label
+                    key={i}
+                    onClick={() => toggleCheck(c)}
+                    className={`flex items-start gap-2 cursor-pointer p-2 rounded-lg transition-colors ${
+                      checked ? 'bg-amber-500/15' : 'hover:bg-gray-800/40'
+                    }`}
+                  >
+                    <span className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center text-[10px] flex-shrink-0 ${
+                      checked ? 'bg-amber-400 border-amber-400 text-gray-900' : 'border-gray-600 text-transparent'
+                    }`}>✓</span>
+                    <span className={`text-[11px] leading-relaxed ${checked ? 'text-amber-200' : 'text-gray-300'}`}>{c}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {selfChecked.length === checks.length && (
+              <div className="mt-3 text-[11px] text-emerald-300 font-bold">
+                ✓ 5가지 모두 통과 — 이제 보내도 됩니다.
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

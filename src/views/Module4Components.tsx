@@ -226,6 +226,8 @@ export const Lesson47Interactive = ({ onExecute }: { onExecute: (data: {title: s
   const [chatSent, setChatSent] = useState(false);
   const [aiTyping, setAiTyping] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [createSubmenuOpen, setCreateSubmenuOpen] = useState(false);
 
   const handleUpload = () => {
     setUploading(true);
@@ -296,13 +298,36 @@ export const Lesson47Interactive = ({ onExecute }: { onExecute: (data: {title: s
           <div className="text-xs text-gray-400 px-2 py-1.5 rounded hover:bg-gray-800/50">📁 Projects</div>
           <button
             onClick={() => step === 1 && setStep(2)}
-            className={`text-left text-xs px-2 py-1.5 rounded transition-all ${step >= 2 ? 'bg-canva-purple/20 text-canva-purple border border-canva-purple/40' : 'text-gray-300 hover:bg-gray-800/70 border border-transparent animate-pulse'}`}
+            className={`text-left text-xs px-2 py-1.5 rounded transition-all ${step >= 2 ? 'bg-canva-purple/20 text-canva-purple border border-canva-purple/40' : 'text-gray-300 hover:bg-gray-800/70 border border-transparent btn-highlight'}`}
           >
             {step >= 2 ? '✓' : '➕'} 커스터마이즈
           </button>
           <div className="text-xs text-gray-500 px-2 py-1.5">⚙️ 설정</div>
-          <div className="mt-auto text-[10px] text-gray-600 border-t border-gray-800 pt-2">
-            현재 단계: <span className="text-canva-teal font-bold">{Math.min(step, 5)}/5</span>
+          <div className="mt-auto border-t border-gray-800 pt-2 flex items-center justify-between gap-2">
+            <button
+              onClick={() => {
+                setAddMenuOpen(false);
+                setCreateSubmenuOpen(false);
+                if (step === 5) {
+                  // 업로드 완료 화면에서 되돌아가면 업로드/대화 상태도 초기화
+                  setUploaded(false);
+                  setChatSent(false);
+                  setChatInput('');
+                  setShowResponse(false);
+                  setAiTyping(false);
+                }
+                setStep(s => Math.max(1, s - 1));
+              }}
+              disabled={step <= 1}
+              className="text-[10px] px-2 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="직전 단계로 돌아가기"
+            >
+              ← 이전
+            </button>
+            <div className="text-[10px] text-gray-600">
+              <span className="text-canva-teal font-bold">{Math.min(step, 5)}</span>
+              <span className="text-gray-700">/5</span>
+            </div>
           </div>
         </div>
 
@@ -324,49 +349,171 @@ export const Lesson47Interactive = ({ onExecute }: { onExecute: (data: {title: s
             </div>
           )}
 
-          {/* Step 2: 커스터마이즈 탭 선택 */}
+          {/* Step 2: Customize 첫 화면 — 좌측 [스킬] 탭 클릭 */}
           {step === 2 && (
             <div className="p-5 flex flex-col gap-4">
-              <div className="text-white font-bold text-sm">Step 1/3 · 커스터마이즈 메뉴</div>
-              <div className="bg-[#1c232b] border border-gray-700 rounded-lg p-4">
-                <div className="flex gap-2 border-b border-gray-700 pb-2 mb-3">
-                  <div className="px-3 py-1.5 text-xs text-gray-500 border-b-2 border-transparent">프로필</div>
-                  <div className="px-3 py-1.5 text-xs text-gray-500 border-b-2 border-transparent">스타일</div>
-                  <button
-                    onClick={() => setStep(3)}
-                    className="px-3 py-1.5 text-xs text-canva-teal border-b-2 border-canva-teal font-bold animate-pulse"
-                  >
-                    스킬
-                  </button>
-                  <div className="px-3 py-1.5 text-xs text-gray-500 border-b-2 border-transparent">연동</div>
+              <div className="text-white font-bold text-sm">Step 1/3 · Customize 화면 — 좌측 [스킬] 탭 선택</div>
+              <div className="bg-[#1c232b] border border-gray-700 rounded-lg overflow-hidden">
+                {/* Customize 상단 헤더 */}
+                <div className="px-3 py-2 border-b border-gray-700 text-[11px] text-gray-400 flex items-center gap-1.5">
+                  ← Customize
                 </div>
-                <div className="text-xs text-gray-400">
-                  👆 상단 탭에서 <span className="text-canva-teal font-bold">[스킬]</span> 탭을 클릭하세요.
+                <div className="flex min-h-[260px]">
+                  {/* 좌측 탭 컬럼 */}
+                  <div className="w-[150px] border-r border-gray-700 p-2 flex flex-col gap-1">
+                    <button
+                      onClick={() => setStep(3)}
+                      className="text-left text-[11px] px-2.5 py-1.5 rounded text-canva-teal bg-canva-teal/10 border border-canva-teal/40 font-bold btn-highlight btn-highlight-teal"
+                    >
+                      📜 스킬
+                    </button>
+                    <div className="text-[11px] px-2.5 py-1.5 rounded text-gray-400">
+                      🔌 커넥터
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-700/60">
+                      <div className="flex items-center justify-between px-1.5 py-1 text-[10px] text-gray-500">
+                        <span>개인 플러그인</span>
+                        <span className="text-gray-600">+</span>
+                      </div>
+                      <div className="text-[10px] text-gray-600 px-1.5 py-1 leading-snug">
+                        플러그인으로 Claude에게 역할 수준의 전문성 부여
+                      </div>
+                      <button className="w-full mt-2 px-2 py-1.5 text-[10px] text-gray-400 border border-gray-700 rounded">
+                        플러그인 탐색
+                      </button>
+                    </div>
+                  </div>
+                  {/* 우측 메인 — 빈 상태 */}
+                  <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
+                    <div className="text-3xl mb-2">💼</div>
+                    <div className="text-sm text-gray-200 font-bold mb-1">Claude 맞춤설정</div>
+                    <div className="text-[11px] text-gray-500 mb-4 max-w-[280px]">
+                      스킬, 커넥터, 플러그인은 Claude가 사용자와 함께 작업하는 방식을 결정합니다.
+                    </div>
+                    <div className="flex flex-col gap-2 w-full max-w-[260px]">
+                      <div className="flex items-center gap-2 px-3 py-2 border border-gray-700 rounded text-left">
+                        <span className="text-base">🔌</span>
+                        <div className="flex-1">
+                          <div className="text-[11px] text-gray-200 font-semibold">앱 연결</div>
+                          <div className="text-[9px] text-gray-500">Claude가 이미 사용 중인 도구를 읽고 쓸 수 있도록</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 border border-gray-700 rounded text-left">
+                        <span className="text-base">📜</span>
+                        <div className="flex-1">
+                          <div className="text-[11px] text-gray-200 font-semibold">새 스킬 만들기</div>
+                          <div className="text-[9px] text-gray-500">Claude에게 프로세스, 팀 규범, 전문 지식을 가르치세요</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </div>
+              <div className="text-[11px] text-gray-500">
+                👆 좌측의 <span className="text-canva-teal font-bold">[📜 스킬]</span> 탭을 클릭하세요.
               </div>
             </div>
           )}
 
-          {/* Step 3: 스킬 업로드 버튼 */}
+          {/* Step 3: 스킬 탭 — [+] 버튼 → 스킬 업로드 */}
           {step === 3 && (
             <div className="p-5 flex flex-col gap-4">
-              <div className="text-white font-bold text-sm">Step 2/3 · 스킬 관리 페이지</div>
-              <div className="bg-[#1c232b] border border-gray-700 rounded-lg p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <div className="text-sm text-gray-200 font-semibold">내 스킬 (0개)</div>
-                  <button
-                    onClick={() => setStep(4)}
-                    className="px-3 py-1.5 bg-canva-purple text-white rounded text-xs font-bold hover:bg-opacity-90 animate-pulse"
-                  >
-                    + 스킬 업로드
-                  </button>
+              <div className="text-white font-bold text-sm">Step 2/3 · 스킬 탭에서 [+] → [스킬 업로드]</div>
+              <div className="bg-[#1c232b] border border-gray-700 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 border-b border-gray-700 text-[11px] text-gray-400 flex items-center gap-1.5">
+                  ← Customize
                 </div>
-                <div className="border border-dashed border-gray-700 rounded-lg p-6 text-center text-xs text-gray-500">
-                  아직 설치된 스킬이 없습니다
+                <div className="flex min-h-[280px]">
+                  {/* 좌측 탭 컬럼 (스킬 선택됨) */}
+                  <div className="w-[130px] border-r border-gray-700 p-2 flex flex-col gap-1">
+                    <div className="text-[11px] px-2.5 py-1.5 rounded text-canva-teal bg-canva-teal/15 border border-canva-teal/40 font-bold">
+                      📜 스킬
+                    </div>
+                    <div className="text-[11px] px-2.5 py-1.5 rounded text-gray-400">
+                      🔌 커넥터
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-700/60 flex items-center justify-between px-1.5 py-1 text-[10px] text-gray-500">
+                      <span>개인 플러그인</span>
+                      <span className="text-gray-600">+</span>
+                    </div>
+                  </div>
+                  {/* 중간 컬럼 — 스킬 리스트 */}
+                  <div className="flex-1 p-3 relative">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-xs text-gray-200 font-bold">스킬</div>
+                      <div className="flex items-center gap-1.5">
+                        <button className="w-6 h-6 rounded text-gray-500 hover:bg-gray-800 flex items-center justify-center text-xs">
+                          🔍
+                        </button>
+                        <button
+                          onClick={() => { setAddMenuOpen(v => !v); setCreateSubmenuOpen(false); }}
+                          className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold transition-all ${
+                            addMenuOpen
+                              ? 'bg-canva-purple text-white'
+                              : 'text-canva-purple bg-canva-purple/10 border border-canva-purple/40 btn-highlight'
+                          }`}
+                          title="추가"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-gray-500 mb-2">개인 스킬</div>
+                    <div className="border border-dashed border-gray-700 rounded p-4 text-center text-[10px] text-gray-500">
+                      아직 추가된 개인 스킬이 없습니다
+                    </div>
+
+                    {/* [+] 드롭다운 메뉴 */}
+                    {addMenuOpen && (
+                      <div className="absolute top-10 right-3 z-20 bg-[#0f1318] border border-gray-700 rounded-lg shadow-2xl py-1 min-w-[170px]">
+                        <button
+                          onClick={() => { setAddMenuOpen(false); }}
+                          className="w-full text-left px-3 py-2 text-[11px] text-gray-300 hover:bg-gray-800 flex items-center gap-2"
+                        >
+                          <span className="text-xs">🗂️</span> 스킬 둘러보기
+                        </button>
+                        <div
+                          onMouseEnter={() => setCreateSubmenuOpen(true)}
+                          onMouseLeave={() => setCreateSubmenuOpen(false)}
+                          className="relative"
+                        >
+                          <button
+                            onClick={() => setCreateSubmenuOpen(v => !v)}
+                            className={`w-full text-left px-3 py-2 text-[11px] flex items-center justify-between gap-2 hover:bg-gray-800 ${createSubmenuOpen ? 'bg-gray-800 text-white' : 'text-gray-300'}`}
+                          >
+                            <span className="flex items-center gap-2"><span className="text-xs">➕</span> 스킬 만들기</span>
+                            <span className="text-gray-500">▶</span>
+                          </button>
+                          {createSubmenuOpen && (
+                            <div className="absolute right-full top-0 mr-1 bg-[#0f1318] border border-gray-700 rounded-lg shadow-2xl py-1 min-w-[180px]">
+                              <button
+                                onClick={() => { setAddMenuOpen(false); setCreateSubmenuOpen(false); }}
+                                className="w-full text-left px-3 py-2 text-[11px] text-gray-300 hover:bg-gray-800 flex items-center gap-2"
+                              >
+                                <span className="text-xs">🤖</span> Claude와 함께 창작하기
+                              </button>
+                              <button
+                                onClick={() => { setAddMenuOpen(false); setCreateSubmenuOpen(false); }}
+                                className="w-full text-left px-3 py-2 text-[11px] text-gray-300 hover:bg-gray-800 flex items-center gap-2"
+                              >
+                                <span className="text-xs">📝</span> 스킬 지침 작성
+                              </button>
+                              <button
+                                onClick={() => { setAddMenuOpen(false); setCreateSubmenuOpen(false); setStep(4); }}
+                                className="w-full text-left px-3 py-2 text-[11px] text-canva-purple bg-canva-purple/10 hover:bg-canva-purple/20 font-bold flex items-center gap-2 btn-highlight"
+                              >
+                                <span className="text-xs">⬆️</span> 스킬 업로드
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="text-[11px] text-gray-500">
-                👆 우측 상단의 <span className="text-canva-purple font-bold">[+ 스킬 업로드]</span> 버튼을 클릭하세요.
+                👆 우측 상단의 <span className="text-canva-purple font-bold">[+]</span> → <span className="text-gray-300">[스킬 만들기]</span> → <span className="text-canva-purple font-bold">[스킬 업로드]</span> 순서로 클릭하세요.
               </div>
             </div>
           )}
@@ -392,7 +539,7 @@ export const Lesson47Interactive = ({ onExecute }: { onExecute: (data: {title: s
                       <div className="text-[10px] text-gray-500 mb-3">크기: 245 KB · 출처: 메타교육 블로그</div>
                       <button
                         onClick={handleUpload}
-                        className="px-4 py-2 bg-canva-purple text-white rounded text-xs font-bold hover:bg-opacity-90"
+                        className="px-4 py-2 bg-canva-purple text-white rounded text-xs font-bold hover:bg-opacity-90 btn-highlight"
                       >
                         이 스킬 업로드
                       </button>

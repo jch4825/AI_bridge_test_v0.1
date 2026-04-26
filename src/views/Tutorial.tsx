@@ -7,6 +7,7 @@ import { GoogleGenAI } from "@google/genai";
 import { modules, lessons, Lesson } from '../data/tutorialData';
 import { Module } from '../types';
 import { friendlyApiError } from '../utils/apiError';
+import { getTheme } from '../utils/moduleThemes';
 import SpeakButton from '../components/SpeakButton';
 import {
   Lesson41Interactive,
@@ -23,7 +24,8 @@ import {
   Lesson53Interactive,
   Lesson54Interactive,
   Lesson55Interactive,
-  Lesson56Interactive
+  Lesson56Interactive,
+  Lesson57Interactive
 } from './Module5Components';
 
 let module4PrinciplesShown = false;
@@ -36,6 +38,7 @@ interface LessonViewerProps {
   onMarkComplete: (lessonId: string) => void;
   isCompleted: boolean;
   onNavigateToLesson: (lessonId: string) => void;
+  completedLessons: string[];
 }
 
 const LEARNING_POINTS: Record<string, string[]> = {
@@ -62,7 +65,9 @@ const LEARNING_POINTS: Record<string, string[]> = {
   ]
 };
 
-function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMarkComplete, isCompleted, onNavigateToLesson }: LessonViewerProps) {
+function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMarkComplete, isCompleted, onNavigateToLesson, completedLessons }: LessonViewerProps) {
+  const theme = getTheme(lesson.moduleId);
+  const currentModule = modules.find(m => m.id === lesson.moduleId);
   const [userInput, setUserInput] = useState(lesson.interactive?.initialInput || '');
   const [aiResponse, setAiResponse] = useState<any>('');
   const [isTyping, setIsTyping] = useState(false);
@@ -75,6 +80,32 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
   const [metaPromptCopied, setMetaPromptCopied] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const runIdRef = useRef(0);
+  const leftScrollRef = useRef<HTMLDivElement | null>(null);
+  const hasReachedEndRef = useRef(false);
+  const mountTimeRef = useRef<number>(Date.now());
+  const manualToggleClickedRef = useRef(false);
+
+  useEffect(() => {
+    hasReachedEndRef.current = false;
+    mountTimeRef.current = Date.now();
+    manualToggleClickedRef.current = false;
+
+    const el = leftScrollRef.current;
+    if (!el) return;
+    const check = () => {
+      const ratio = (el.scrollTop + el.clientHeight) / Math.max(el.scrollHeight, 1);
+      if (ratio >= 0.95) {
+        hasReachedEndRef.current = true;
+        el.removeEventListener('scroll', check);
+      }
+    };
+    if (el.scrollHeight <= el.clientHeight + 4) {
+      hasReachedEndRef.current = true;
+      return;
+    }
+    el.addEventListener('scroll', check, { passive: true });
+    return () => el.removeEventListener('scroll', check);
+  }, [lesson.id]);
 
   // 현재 모듈의 레슨 순서에서 다음 레슨 계산 (l1-4 숏컷 제외)
   const nextLesson = (() => {
@@ -182,10 +213,12 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
 
     // Special handling for lesson 1-4: Save API Key
     if (lesson.id === 'l1-4') {
-      const apiKey = inputToUse.trim();
-      if (apiKey.startsWith('AIza')) {
+      const apiKey = inputToUse.replace(/\s+/g, '');
+      if (apiKey.startsWith('AIza') && apiKey.length >= 30) {
         localStorage.setItem('gemini-api-key', apiKey);
         setHasApiKey(true);
+        // 사이드바·상단 네비 등 다른 곳의 hasApiKey 상태가 즉시 반영되도록
+        window.dispatchEvent(new Event('api-key-changed'));
       }
     }
 
@@ -195,26 +228,51 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
       let fullText = "";
 
       if (!savedKey || savedKey.length < 10) {
-        fullText = "(API키가 제대로 작동하지 않아, default 답변을 생성합니다.) API키를 입력한 후 실습을 진행해 보세요.";
+        if (lesson.interactive.simulationAnswer) {
+          fullText = lesson.interactive.simulationAnswer;
+        } else {
+          fullText = "(API키가 제대로 작동하지 않아, default 답변을 생성합니다.) API키를 입력한 후 실습을 진행해 보세요.";
+        }
       } else {
-        try {
+        // 모든 AI 답변에 공통 적용되는 가독성 포맷 규칙
+        const FORMAT_RULE = "\n\n[형식 규칙] 가독성을 위해 ① 글자 색깔 변경(HTML 태그·인라인 스타일 포함)은 절대 사용하지 않습니다. ② 표(마크다운 테이블 포함)는 만들지 않습니다.";
+
+        let systemInstruction = "";
+
+        if (lesson.interactive.systemPrompt) {
+          systemInstruction = lesson.interactive.systemPrompt + FORMAT_RULE;
+        } else if (lesson.id === 'l1-5') {
+          systemInstruction = "답변은 반드시 5줄 이내로 간결하게 작성해주세요." + FORMAT_RULE;
+        }
+
+        const callOnce = async () => {
           const ai = new GoogleGenAI({ apiKey: savedKey });
-          // 모든 AI 답변에 공통 적용되는 가독성 포맷 규칙
-          const FORMAT_RULE = "\n\n[형식 규칙] 가독성을 위해 ① 글자 색깔 변경(HTML 태그·인라인 스타일 포함)은 절대 사용하지 않습니다. ② 표(마크다운 테이블 포함)는 만들지 않습니다.";
-
-          let systemInstruction = "";
-
-          if (lesson.interactive.systemPrompt) {
-            systemInstruction = lesson.interactive.systemPrompt + FORMAT_RULE;
-          } else if (lesson.id === 'l1-5') {
-            systemInstruction = "답변은 반드시 5줄 이내로 간결하게 작성해주세요." + FORMAT_RULE;
-          }
-
-          const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+          return await ai.models.generateContent({
+            model: "gemini-2.5-flash",
             contents: inputToUse,
             config: systemInstruction ? { systemInstruction } : undefined
           });
+        };
+
+        // 신규 키 전파 지연(Google 측) 대응: API_KEY_INVALID 만 1회 자동 재시도
+        const isPropagationError = (e: any) => {
+          const msg = (e?.message ?? '').toString();
+          return /API_KEY_INVALID|API key expired|API key not valid|key expired/i.test(msg);
+        };
+
+        try {
+          let response;
+          try {
+            response = await callOnce();
+          } catch (firstErr) {
+            if (isPropagationError(firstErr)) {
+              // 1.8초 대기 후 재시도 (Google 인증 서버 전파 시간)
+              await new Promise(r => setTimeout(r, 1800));
+              response = await callOnce();
+            } else {
+              throw firstErr;
+            }
+          }
 
           fullText = response.text || "답변을 생성할 수 없습니다.";
 
@@ -258,7 +316,12 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
   };
 
   return (
-    <div className="flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden bg-[#0e1318]">
+    <div
+      className="flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden"
+      style={{
+        background: `radial-gradient(ellipse 60% 50% at 100% 0%, ${theme.glowA}, transparent 60%), radial-gradient(ellipse 50% 50% at 0% 100%, ${theme.glowB}, transparent 60%), #0e1318`,
+      }}
+    >
       {showOverlay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 overflow-y-auto" style={{ minHeight: '100vh' }}>
           <div className="bg-white rounded-xl max-w-[480px] w-full p-8 shadow-2xl relative">
@@ -315,43 +378,99 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
             >
               <ArrowLeft size={20} />
             </button>
-            <div className="flex gap-1.5 py-1">
+            <div className="flex items-center py-1">
               {(() => {
                 let moduleLessons = lessons
                   .filter(l => l.moduleId === lesson.moduleId)
                   .sort((a, b) => a.order - b.order);
-                  
+
                 if (lesson.moduleId === 'm2' || lesson.moduleId === 'm3' || lesson.moduleId === 'm5') {
                   const apiLesson = lessons.find(l => l.id === 'l1-4');
                   if (apiLesson) {
                     moduleLessons = [apiLesson, ...moduleLessons];
                   }
                 }
-                
-                return moduleLessons.map(ml => (
-                  <button
-                    key={ml.id}
-                    onClick={() => onNavigateToLesson(ml.id)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all border ${
-                      ml.id === lesson.id 
-                        ? 'bg-canva-purple border-canva-purple text-white shadow-sm' 
-                        : 'bg-white border-gray-200 text-gray-400 hover:border-canva-purple/30 hover:text-canva-purple'
-                    }`}
-                  >
-                    {ml.id === 'l1-4' ? 'API입력(1.4)' : ml.id.replace('l', '').replace('-', '.')}
-                  </button>
-                ));
+
+                return moduleLessons.map((ml, idx) => {
+                  const isCurrent = ml.id === lesson.id;
+                  const isDone = completedLessons.includes(ml.id);
+                  const isShortcut = ml.id === 'l1-4' && lesson.moduleId !== 'm1';
+                  const filled = isCurrent || isDone;
+                  return (
+                    <React.Fragment key={ml.id}>
+                      {idx > 0 && (
+                        <div
+                          className="w-3 h-px transition-colors"
+                          style={{ backgroundColor: filled ? theme.accent + '60' : '#e5e7eb' }}
+                        />
+                      )}
+                      <button
+                        onClick={() => onNavigateToLesson(ml.id)}
+                        title={ml.title}
+                        className={`relative h-7 px-2.5 min-w-[2.25rem] rounded-full flex items-center justify-center gap-1 text-[10px] font-bold transition-all flex-shrink-0 ${
+                          isCurrent ? 'text-white scale-105 shadow-md ring-2 ring-offset-1' :
+                          isDone ? 'text-white hover:scale-105' :
+                          'bg-white border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600'
+                        }`}
+                        style={
+                          isCurrent
+                            ? { backgroundColor: theme.accent, boxShadow: `0 4px 14px ${theme.accentSoft}` }
+                            : isDone
+                              ? { backgroundColor: theme.accent + 'cc' }
+                              : undefined
+                        }
+                      >
+                        <span className="relative flex items-center gap-1">
+                          {isShortcut ? (
+                            <><Lock size={10} /> 1.4</>
+                          ) : (
+                            <>
+                              {isDone && !isCurrent && <Check size={10} />}
+                              {ml.id.replace('l', '').replace('-', '.')}
+                            </>
+                          )}
+                        </span>
+                      </button>
+                    </React.Fragment>
+                  );
+                });
               })()}
             </div>
           </div>
           <span className="text-[10px] font-bold text-canva-purple uppercase tracking-widest flex-shrink-0 ml-2 hidden md:inline">Explanation</span>
         </div>
-        <div className="flex-1 overflow-y-auto p-10 min-w-0 bg-white relative">
-          <div className="w-full pb-20" style={{ maxWidth: '40em' }}>
-            <div className="flex items-start justify-between gap-4 mb-8">
-              <h2 className="text-3xl font-bold text-canva-ink break-words flex-1">{lesson.title}</h2>
-              <SpeakButton text={`${lesson.title}. ${lesson.content}`} label="레슨 본문 듣기" />
+        <div ref={leftScrollRef} className="flex-1 overflow-y-auto min-w-0 bg-white relative">
+          <div
+            className={`relative px-10 pt-10 pb-8 mb-2 overflow-hidden bg-gradient-to-br ${theme.gradient}`}
+          >
+            <div
+              className="pointer-events-none absolute -top-10 -right-6 text-[160px] font-black select-none leading-none"
+              style={{ color: theme.accent, opacity: 0.10 }}
+            >
+              {lesson.id.replace('l', '').replace('-', '.')}
             </div>
+            <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{
+              backgroundImage: 'radial-gradient(circle at 1px 1px, #000 1px, transparent 0)',
+              backgroundSize: '18px 18px',
+            }} />
+            <div className="relative" style={{ maxWidth: '40em' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">{theme.emoji}</span>
+                <span
+                  className="text-[11px] font-bold uppercase tracking-widest"
+                  style={{ color: theme.accent }}
+                >
+                  Module {currentModule?.order ?? '·'} · Lesson {lesson.order}
+                </span>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-3xl font-bold text-canva-ink break-words flex-1 leading-tight">{lesson.title}</h2>
+                <SpeakButton text={`${lesson.title}. ${lesson.content}`} label="레슨 본문 듣기" />
+              </div>
+              <div className="mt-5 h-1 w-16 rounded-full" style={{ backgroundColor: theme.accent }} />
+            </div>
+          </div>
+          <div className="w-full px-10 pb-20" style={{ maxWidth: '40em' }}>
             <div className="markdown-container text-canva-ink leading-relaxed text-base">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -420,7 +539,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
       <div className="w-full lg:w-3/5 flex flex-col lg:h-full lg:overflow-hidden">
         <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
           {/* Main interactive area: full height for m4, otherwise top half */}
-          <div className={`flex flex-col bg-[#0e1318] border-gray-800 min-h-0 ${lesson.moduleId === 'm4' ? 'flex-1' : 'lg:flex-[3] lg:border-b md:flex-1'}`}>
+          <div className={`flex flex-col border-gray-800 min-h-0 ${lesson.moduleId === 'm4' ? 'flex-1' : 'lg:flex-[3] lg:border-b md:flex-1'}`}>
             <div className="p-4 border-b border-gray-800 flex items-center justify-between shrink-0 hidden md:flex">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">문제 입력</span>
               {(lesson.id === 'l1-5' || lesson.id === 'l2-6' || lesson.id === 'l2-7' || (lesson.moduleId === 'm3' && lesson.id !== 'l3-1') || lesson.id === 'l5-5') && (
@@ -434,6 +553,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                         if (window.confirm('저장된 API 키를 삭제하시겠습니까?\n공용 PC에서는 사용 후 꼭 해제해 주세요.')) {
                           localStorage.removeItem('gemini-api-key');
                           setHasApiKey(false);
+                          window.dispatchEvent(new Event('api-key-changed'));
                         }
                       }}
                       className="text-[10px] px-2 py-1 rounded-full font-bold border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors"
@@ -506,10 +626,16 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                       {lesson.id === 'l5-3' && <Lesson53Interactive />}
                       {lesson.id === 'l5-4' && <Lesson54Interactive />}
                       {lesson.id === 'l5-5' && <Lesson55Interactive onRun={handleRun} setUserInput={setUserInput} onNavigateToLesson={onNavigateToLesson} />}
-                      {lesson.id === 'l5-6' && <Lesson56Interactive />}
+                      {/* l5-6 = AI Slop (Lesson57Interactive), l5-7 = 가이드라인 (Lesson56Interactive) — 원래 코드 만들 때 순서가 반대였어서 매핑이 cross-됨 */}
+                      {lesson.id === 'l5-6' && <Lesson57Interactive />}
+                      {lesson.id === 'l5-7' && <Lesson56Interactive />}
                     </>
                   ) : lesson.id !== 'l2-1' && lesson.id !== 'l2-2' && lesson.id !== 'l2-3' && lesson.id !== 'l2-4' && lesson.id !== 'l2-5' && lesson.id !== 'l3-1' && (
-                    <div className="flex-1 bg-[#1c232b] rounded-xl p-5 border border-gray-800 relative group min-h-[200px]">
+                    <div
+                      className="flex-1 rounded-xl p-[1px] relative group min-h-[200px]"
+                      style={{ background: `linear-gradient(135deg, ${theme.accent}55, transparent 40%, ${theme.accent}30)` }}
+                    >
+                    <div className="w-full h-full bg-[#1c232b] rounded-[11px] p-5 relative">
                       <textarea
                         value={userInput}
                         onChange={(e) => setUserInput(e.target.value)}
@@ -553,7 +679,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                         >
                           초기화
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleRun()}
                           disabled={isTyping}
                           className="px-8 py-3 bg-canva-teal text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-teal-900/20"
@@ -561,6 +687,7 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                           실행 (Run)
                         </button>
                       </div>
+                    </div>
                     </div>
                   )}
                 </>
@@ -574,16 +701,33 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
 
           {/* AI Response area (Hidden for M4 because it uses popup) */}
           {lesson.moduleId !== 'm4' && (
-            <div className="lg:flex-[2] flex flex-col bg-[#0e1318] min-h-0 md:hidden lg:flex border-t border-gray-800">
+            <div className="lg:flex-[2] flex flex-col min-h-0 md:hidden lg:flex border-t border-gray-800">
               <div className="p-4 border-b border-gray-800 flex items-center justify-center shrink-0 hidden md:flex">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">답변 안내</span>
               </div>
               <div className="flex-1 p-8 overflow-y-auto no-scrollbar">
-                <div className="bg-[#1c232b] rounded-xl p-8 border border-gray-800 min-h-[160px] relative">
+                <div
+                  className="rounded-xl p-[1px] min-h-[160px] relative"
+                  style={{ background: `linear-gradient(135deg, ${theme.accent}55, transparent 45%, ${theme.accent}25)` }}
+                >
+                <div className="bg-[#1c232b] rounded-[11px] p-8 relative">
                   <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-canva-teal rounded-full animate-pulse"></div>
-                      <span className="text-[10px] font-bold text-canva-teal uppercase tracking-widest">AI Response</span>
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span
+                          className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
+                          style={{ backgroundColor: theme.accent }}
+                        />
+                        <span
+                          className="relative inline-flex rounded-full h-2.5 w-2.5"
+                          style={{ backgroundColor: theme.accent }}
+                        />
+                      </span>
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-widest"
+                        style={{ color: theme.accent }}
+                      >AI Response</span>
+                      <span className="h-px flex-1 max-w-[80px]" style={{ background: `linear-gradient(to right, ${theme.accent}80, transparent)` }} />
                     </div>
                     {(lesson.id === 'l2-6' || lesson.id === 'l2-7' || (lesson.moduleId === 'm3' && lesson.id !== 'l3-1') || lesson.id === 'l4-1' || lesson.id === 'l4-2' || lesson.id === 'l5-5') && aiResponse && !isTyping && (
                       <button
@@ -643,7 +787,8 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
                     )}
                   </div>
                 </div>
-                
+                </div>
+
                 {aiResponse && !isTyping && (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
@@ -674,7 +819,10 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
         {/* Navigation / Completion Buttons */}
         <div className="sticky bottom-0 p-6 border-t border-gray-800 flex justify-end gap-3 bg-[#0e1318] shrink-0 z-10">
           <button
-            onClick={() => onToggleComplete(lesson.id)}
+            onClick={() => {
+              manualToggleClickedRef.current = true;
+              onToggleComplete(lesson.id);
+            }}
             className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
               isCompleted
                 ? 'bg-canva-teal text-white'
@@ -689,7 +837,15 @@ function LessonViewer({ lesson, onBack, onModuleComplete, onToggleComplete, onMa
           </button>
           <button
             onClick={() => {
-              onMarkComplete(lesson.id);
+              const signals = [
+                hasReachedEndRef.current,
+                !!aiResponse,
+                Date.now() - mountTimeRef.current >= 60_000,
+                manualToggleClickedRef.current,
+              ].filter(Boolean).length;
+              if (signals >= 2) {
+                onMarkComplete(lesson.id);
+              }
               if (nextLesson) {
                 onNavigateToLesson(nextLesson.id);
               } else {
@@ -831,55 +987,107 @@ export default function Tutorial({ selectedModule, onSelectModule, completedLess
         <p className="text-canva-ink">LLM 이해부터 윤리 점검까지, 초등교사를 위한 5단계 로드맵입니다.</p>
       </header>
 
-      <div className="space-y-6">
+      <div className="space-y-5">
         {modules.map((module, index) => {
           const moduleLessons = lessons.filter(l => l.moduleId === module.id);
           const completedInModule = moduleLessons.filter(l => completedLessons.includes(l.id)).length;
           const isCompleted = completedInModule === module.lessonsCount && module.lessonsCount > 0;
+          const progressPct = module.lessonsCount ? (completedInModule / module.lessonsCount) * 100 : 0;
+          const theme = getTheme(module.id);
 
           return (
             <motion.div
               key={module.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              transition={{ delay: index * 0.08 }}
+              whileHover={{ y: -4 }}
               onClick={() => onSelectModule(module)}
-              className="bg-white border border-canva-border rounded-2xl p-6 hover:shadow-md transition-all cursor-pointer group flex items-center gap-6"
+              className="bg-white border border-canva-border rounded-2xl overflow-hidden cursor-pointer group flex transition-shadow hover:shadow-xl"
+              style={{ ['--accent' as any]: theme.accent } as React.CSSProperties}
             >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${
-                isCompleted ? 'bg-canva-teal text-white' : 'bg-canva-bg text-canva-purple'
-              }`}>
-                {isCompleted ? <CheckCircle2 size={24} /> : module.order}
-              </div>
-              
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-canva-ink group-hover:text-canva-purple transition-colors">
-                  {module.title}
-                </h3>
-                <p className="text-sm text-canva-gray mt-1">{module.description}</p>
-                <div className="mt-2" onClick={e => e.stopPropagation()}>
-                  <SpeakButton
-                    text={`${module.title}. ${module.description}`}
-                    label="모듈 설명 듣기"
-                    stopPropagation
-                  />
+              {/* Left colored panel (1/4) */}
+              <div
+                className={`relative w-1/4 min-w-[140px] p-5 flex flex-col justify-between bg-gradient-to-br ${theme.gradient} overflow-hidden`}
+              >
+                <div
+                  className="pointer-events-none absolute -bottom-6 -right-2 text-[110px] font-black select-none leading-none"
+                  style={{ color: theme.accent, opacity: 0.18 }}
+                >
+                  {module.order}
                 </div>
-                <div className="flex items-center gap-4 mt-3">
-                  <span className="text-[11px] font-bold text-canva-gray uppercase flex items-center gap-1">
-                    <BookOpen size={12} /> {module.lessonsCount} 레슨
+                <div className="pointer-events-none absolute inset-0 opacity-[0.05]" style={{
+                  backgroundImage: 'radial-gradient(circle at 1px 1px, #000 1px, transparent 0)',
+                  backgroundSize: '14px 14px',
+                }} />
+                <div className="relative flex items-center gap-2">
+                  <span className="text-2xl">{theme.emoji}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: theme.accent }}>
+                    Module {module.order}
                   </span>
-                  <span className="text-[11px] font-bold text-canva-gray uppercase flex items-center gap-1">
-                    <Clock size={12} /> {module.estimatedTime}
-                  </span>
-                  {completedInModule > 0 && (
-                    <span className="text-[11px] font-bold text-canva-teal uppercase">
-                      진행도: {completedInModule}/{module.lessonsCount}
-                    </span>
+                </div>
+                <div className="relative">
+                  {isCompleted ? (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/80 text-[10px] font-bold" style={{ color: theme.accent }}>
+                      <CheckCircle2 size={12} /> 완료
+                    </div>
+                  ) : completedInModule > 0 ? (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/80 text-[10px] font-bold" style={{ color: theme.accent }}>
+                      진행 중 · {completedInModule}/{module.lessonsCount}
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/60 text-[10px] font-bold text-canva-gray">
+                      시작 전
+                    </div>
                   )}
                 </div>
               </div>
 
-              <ChevronRight className="text-canva-border group-hover:text-canva-purple transition-colors" />
+              {/* Right content panel (2/3) */}
+              <div className="flex-1 p-6 flex flex-col justify-between min-w-0">
+                <div>
+                  <h3
+                    className="text-lg font-bold text-canva-ink mb-1.5 leading-snug transition-colors"
+                    style={{ color: undefined }}
+                  >
+                    <span className="group-hover:opacity-80 transition-opacity">{module.title}</span>
+                  </h3>
+                  <p className="text-sm text-canva-gray leading-relaxed">{module.description}</p>
+                  <div className="mt-2" onClick={e => e.stopPropagation()}>
+                    <SpeakButton
+                      text={`${module.title}. ${module.description}`}
+                      label="모듈 설명 듣기"
+                      stopPropagation
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-end justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-[11px] font-bold text-canva-gray uppercase flex items-center gap-1">
+                        <BookOpen size={12} /> {module.lessonsCount} 레슨
+                      </span>
+                      <span className="text-[11px] font-bold text-canva-gray uppercase flex items-center gap-1">
+                        <Clock size={12} /> {module.estimatedTime}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progressPct}%` }}
+                        transition={{ duration: 0.7, ease: 'easeOut', delay: index * 0.08 + 0.2 }}
+                        style={{ backgroundColor: theme.accent }}
+                      />
+                    </div>
+                  </div>
+                  <ChevronRight
+                    className="group-hover:translate-x-1 transition-transform flex-shrink-0"
+                    style={{ color: theme.accent }}
+                  />
+                </div>
+              </div>
             </motion.div>
           );
         })}
@@ -888,49 +1096,153 @@ export default function Tutorial({ selectedModule, onSelectModule, completedLess
   );
 
   const renderLessonList = (module: Module) => {
-    const moduleLessons = lessons.filter(l => l.moduleId === module.id);
+    const moduleLessons = lessons.filter(l => l.moduleId === module.id).sort((a, b) => a.order - b.order);
+    const theme = getTheme(module.id);
+    const completedCount = moduleLessons.filter(l => completedLessons.includes(l.id)).length;
+    const progressPct = moduleLessons.length ? (completedCount / moduleLessons.length) * 100 : 0;
+
+    const getPreview = (content: string) => {
+      const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+      const firstProse = lines.find(l => !l.startsWith('#') && !l.startsWith('-') && !l.startsWith('*') && !l.startsWith('>') && !l.startsWith('!'));
+      if (!firstProse) return '';
+      const cleaned = firstProse.replace(/\*\*/g, '').replace(/`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+      return cleaned.length > 90 ? cleaned.slice(0, 90).trim() + '…' : cleaned;
+    };
 
     return (
       <div className="max-w-4xl mx-auto p-10">
-        <button 
+        <button
           onClick={() => onSelectModule(null)}
           className="flex items-center gap-2 text-canva-gray hover:text-canva-ink mb-8 font-bold text-sm transition-colors"
         >
           <ArrowLeft size={16} /> 모듈 목록으로 돌아가기
         </button>
 
-        <header className="mb-12">
-          <span className="text-xs font-bold text-canva-purple uppercase tracking-widest mb-2 block">모듈 {module.order}</span>
-          <h1 className="text-3xl font-bold text-canva-ink mb-4">{module.title}</h1>
-          <p className="text-canva-gray mb-3">{module.description}</p>
-          <SpeakButton text={`${module.title}. ${module.description}`} label="모듈 설명 듣기" />
+        <header
+          className={`relative mb-12 p-8 rounded-2xl bg-gradient-to-br ${theme.gradient} overflow-hidden border border-gray-100`}
+        >
+          <div
+            className="pointer-events-none absolute -top-8 -right-4 text-[140px] font-black select-none leading-none"
+            style={{ color: theme.accent, opacity: 0.10 }}
+          >
+            {module.order}
+          </div>
+          <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{
+            backgroundImage: 'radial-gradient(circle at 1px 1px, #000 1px, transparent 0)',
+            backgroundSize: '18px 18px',
+          }} />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">{theme.emoji}</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: theme.accent }}>
+                Module {module.order}
+              </span>
+            </div>
+            <h1 className="text-3xl font-bold text-canva-ink mb-3 leading-tight">{module.title}</h1>
+            <p className="text-canva-gray mb-4 max-w-2xl">{module.description}</p>
+            <SpeakButton text={`${module.title}. ${module.description}`} label="모듈 설명 듣기" />
+            {moduleLessons.length > 0 && (
+              <div className="mt-6 max-w-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-canva-ink/70">진행도</span>
+                  <span className="text-xs font-bold" style={{ color: theme.accent }}>
+                    {completedCount} / {moduleLessons.length}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-white/70 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progressPct}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                    style={{ backgroundColor: theme.accent }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </header>
 
-        <div className="space-y-4">
-          {moduleLessons.length > 0 ? (
-            moduleLessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                onClick={() => setCurrentLesson(lesson)}
-                className="bg-white border border-canva-border rounded-xl p-5 hover:border-canva-purple transition-all cursor-pointer flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                    completedLessons.includes(lesson.id) ? 'bg-canva-teal text-white' : 'bg-canva-bg text-canva-gray'
-                  }`}>
-                    {completedLessons.includes(lesson.id) ? <CheckCircle2 size={16} /> : <PlayCircle size={16} />}
-                  </div>
-                  <span className="font-bold text-canva-ink group-hover:text-canva-purple transition-colors">{lesson.title}</span>
-                </div>
-                <span className="text-xs text-canva-gray font-medium">{lesson.estimatedMinutes}분</span>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-20 bg-canva-bg rounded-2xl border border-dashed border-canva-border">
-              <p className="text-canva-gray">이 모듈의 레슨은 준비 중입니다.</p>
+        {moduleLessons.length > 0 ? (
+          <div className="relative pl-14">
+            <div
+              className="absolute left-[22px] top-4 bottom-4 w-0.5 rounded-full"
+              style={{ background: `linear-gradient(to bottom, ${theme.accent}55, ${theme.accent}10)` }}
+            />
+            <div className="space-y-4">
+              {moduleLessons.map((lesson, idx) => {
+                const isDone = completedLessons.includes(lesson.id);
+                const preview = getPreview(lesson.content);
+                const lessonNum = lesson.id.replace('l', '').replace('-', '.');
+                const titleNoNum = lesson.title.replace(/^\d+-\d+\.\s*/, '');
+                return (
+                  <motion.div
+                    key={lesson.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05, duration: 0.3 }}
+                    className="relative group"
+                  >
+                    <div
+                      className="absolute -left-[46px] top-5 w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-transform group-hover:scale-110"
+                      style={
+                        isDone
+                          ? { backgroundColor: theme.accent, color: 'white', boxShadow: `0 0 0 4px var(--color-canva-bg, #f7f5fb)` }
+                          : { backgroundColor: 'white', border: `2px solid ${theme.accent}55`, color: theme.accent, boxShadow: `0 0 0 4px var(--color-canva-bg, #f7f5fb)` }
+                      }
+                    >
+                      {isDone ? <CheckCircle2 size={18} /> : lesson.order}
+                    </div>
+
+                    <div
+                      onClick={() => setCurrentLesson(lesson)}
+                      className="bg-white border border-canva-border rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
+                      style={{ borderLeft: `3px solid ${theme.accent}` }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span
+                              className="text-[10px] font-bold uppercase tracking-wider"
+                              style={{ color: theme.accent }}
+                            >
+                              Lesson {lessonNum}
+                            </span>
+                            {isDone && (
+                              <span className="text-[10px] font-bold text-canva-teal flex items-center gap-1">
+                                <CheckCircle2 size={10} /> 완료
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="font-bold text-canva-ink mb-1.5 leading-snug group-hover:opacity-80 transition-opacity">
+                            {titleNoNum}
+                          </h3>
+                          {preview && (
+                            <p className="text-xs text-canva-gray leading-relaxed line-clamp-2">{preview}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0 pt-0.5">
+                          <span className="text-[11px] text-canva-gray font-medium flex items-center gap-1 whitespace-nowrap">
+                            <Clock size={11} /> {lesson.estimatedMinutes}분
+                          </span>
+                          <ChevronRight
+                            size={18}
+                            className="group-hover:translate-x-1 transition-transform"
+                            style={{ color: theme.accent }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="text-center py-20 bg-canva-bg rounded-2xl border border-dashed border-canva-border">
+            <p className="text-canva-gray">이 모듈의 레슨은 준비 중입니다.</p>
+          </div>
+        )}
       </div>
     );
   };
@@ -956,6 +1268,7 @@ export default function Tutorial({ selectedModule, onSelectModule, completedLess
               onToggleComplete={toggleComplete}
               onMarkComplete={markComplete}
               isCompleted={completedLessons.includes(currentLesson.id)}
+              completedLessons={completedLessons}
               onNavigateToLesson={(id) => {
                 const lesson = lessons.find(l => l.id === id);
                 if (lesson) {

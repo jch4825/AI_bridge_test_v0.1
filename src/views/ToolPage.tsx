@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Copy, FileText, Sparkles } from 'lucide-react';
+import { ArrowLeft, Copy, FileText, Sparkles, BookCheck, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -7,6 +7,7 @@ import { GoogleGenAI } from '@google/genai';
 import { ToolDefinition } from '../tools/ToolRegistry';
 import { friendlyApiError } from '../utils/apiError';
 import SpeakButton from '../components/SpeakButton';
+import { getStandardPreview, formatStandardForPrompt } from '../utils/curriculumLookup';
 
 interface ToolPageProps {
   tool: ToolDefinition;
@@ -25,15 +26,31 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
   const setValue = (id: string, val: string) =>
     setValues(prev => ({ ...prev, [id]: val }));
 
-  const buildUserMessage = () =>
-    tool.inputs
+  const buildUserMessage = () => {
+    const lines = tool.inputs
       .map(input => {
         const val = values[input.id];
         if (!val) return null;
-        return `${input.label}: ${val}`;
+        const display = input.type === 'multiselect' ? val.split('|||').filter(Boolean).join(', ') : val;
+        return `${input.label}: ${display}`;
       })
-      .filter(Boolean)
-      .join('\n');
+      .filter(Boolean);
+
+    // enrichWith === 'curriculumStandard' 인 입력이 있고 매칭되면 공식 데이터 주입
+    const enrichments: string[] = [];
+    for (const input of tool.inputs) {
+      if (input.enrichWith === 'curriculumStandard') {
+        const result = getStandardPreview(values[input.id] || '');
+        if (result.found) {
+          enrichments.push(formatStandardForPrompt(result.standard));
+        }
+      }
+    }
+
+    return enrichments.length > 0
+      ? lines.join('\n') + '\n\n---\n\n' + enrichments.join('\n\n')
+      : lines.join('\n');
+  };
 
   const hasApiKey = (() => {
     const key = localStorage.getItem('gemini-api-key');
@@ -55,15 +72,36 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
     setIsRunning(true);
     setResult('');
 
-    try {
-      const apiKey = localStorage.getItem('gemini-api-key') || '';
+    const apiKey = localStorage.getItem('gemini-api-key') || '';
+    const userMessage = buildUserMessage();
+
+    const startStream = async () => {
       const ai = new GoogleGenAI({ apiKey });
-      const userMessage = buildUserMessage();
-      const response = await ai.models.generateContentStream({
-        model: 'gemini-2.0-flash',
+      return await ai.models.generateContentStream({
+        model: 'gemini-2.5-flash',
         config: { systemInstruction: tool.systemPrompt },
         contents: [{ role: 'user', parts: [{ text: userMessage }] }],
       });
+    };
+
+    // 신규 키 전파 지연 대응: API_KEY_INVALID만 1회 자동 재시도
+    const isPropagationError = (e: any) => {
+      const msg = (e?.message ?? '').toString();
+      return /API_KEY_INVALID|API key expired|API key not valid|key expired/i.test(msg);
+    };
+
+    try {
+      let response;
+      try {
+        response = await startStream();
+      } catch (firstErr) {
+        if (isPropagationError(firstErr)) {
+          await new Promise(r => setTimeout(r, 1800));
+          response = await startStream();
+        } else {
+          throw firstErr;
+        }
+      }
 
       let full = '';
       for await (const chunk of response) {
@@ -178,11 +216,85 @@ export default function ToolPage({ tool, onBack }: ToolPageProps) {
                 onChange={e => setValue(input.id, e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-canva-purple/30 bg-white"
               >
+                <option value="">선택해 주세요</option>
                 {input.options.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             )}
+
+            {input.type === 'multiselect' && input.options && (
+              (() => {
+                const current = (values[input.id] || '').split('|||').filter(Boolean);
+                const toggle = (v: string) => {
+                  const next = current.includes(v) ? current.filter(x => x !== v) : [...current, v];
+                  setValue(input.id, next.join('|||'));
+                };
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {input.options.map(opt => {
+                      const checked = current.includes(opt.value);
+                      return (
+                        <label
+                          key={opt.value}
+                          onClick={() => toggle(opt.value)}
+                          className={`flex items-start gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                            checked
+                              ? 'bg-canva-purple/5 border-canva-purple/50 text-canva-purple'
+                              : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center text-[10px] flex-shrink-0 ${
+                            checked ? 'bg-canva-purple border-canva-purple text-white' : 'border-gray-300 text-transparent'
+                          }`}>✓</span>
+                          <span className="text-sm leading-snug">{opt.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()
+            )}
+
+            {input.hint && (
+              <p className="mt-1.5 text-[11px] text-gray-400">{input.hint}</p>
+            )}
+
+            {input.enrichWith === 'curriculumStandard' && (() => {
+              const result = getStandardPreview(values[input.id] || '');
+              if (result.found) {
+                const s = result.standard;
+                return (
+                  <div className="mt-2 px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-start gap-2">
+                    <BookCheck size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-emerald-700 mb-0.5">
+                        ✓ 인식됨 — {s.code} ({s.gradeGroup}학년 {s.subject} · {s.domain})
+                      </div>
+                      <div className="text-xs text-emerald-900 leading-snug">{s.title}</div>
+                      <div className="text-[10px] text-emerald-700/70 mt-1">
+                        호출 시 공식 성취기준 + A·B·C 수준별 평가 기준이 자동으로 함께 전송됩니다.
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              // 코드처럼 보이지만 매칭 실패한 경우에만 경고 (자유 텍스트엔 표시 안 함)
+              const raw = (values[input.id] || '').trim();
+              const looksLikeCode = /\[?\s*\d+[가-힣]+\s*\d+\s*[-‒–—―−]\s*\d+\s*\]?/.test(raw);
+              if (result.reason === 'invalid' && looksLikeCode) {
+                return (
+                  <div className="mt-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                    <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 text-[11px] text-amber-800 leading-snug">
+                      코드로 인식되지 않습니다. 직접 기술한 성취기준으로 처리되며, 공식 평가 기준 자동 주입은 적용되지 않습니다.
+                      <span className="block text-amber-700/70 mt-0.5">코드 형식 예: <code className="font-mono bg-amber-100 px-1 rounded">[6수01-07]</code>, <code className="font-mono bg-amber-100 px-1 rounded">[4국02-03]</code></span>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         ))}
       </div>
