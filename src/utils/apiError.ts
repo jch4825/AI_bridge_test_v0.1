@@ -19,8 +19,8 @@ export function friendlyApiError(e: any, opts?: { markdown?: boolean }): string 
     raw.includes('UNAUTHENTICATED')
   ) {
     return md
-      ? '🔑 **API 키가 올바르지 않거나 만료되었습니다.**\n\n- 상단의 "API 키 등록" 버튼을 눌러 키를 다시 확인해 주세요.\n- Google AI Studio에서 새 키를 발급받을 수 있습니다.'
-      : '🔑 API 키가 올바르지 않거나 만료되었습니다. API 키를 다시 확인하거나 Google AI Studio에서 새 키를 발급받아 주세요.';
+      ? '🔑 **API 키가 인식되지 않습니다.**\n\n다음 세 가지를 차례로 확인해 주세요:\n\n1. **신규 발급한 키인가요?** — Google이 키를 활성화하는 데 보통 **30초~1분** 정도 걸립니다. 잠시 후 다시 시도해 보세요.\n2. **키가 정확히 입력되었나요?** — 사이드바의 "API 키 등록"에서 키 앞뒤 공백·따옴표가 섞이지 않았는지, "AIza"로 시작하는지 확인해 주세요.\n3. **키가 폐기되지는 않았나요?** — 채팅이나 공개된 곳에 노출된 키는 Google이 자동으로 폐기합니다. [Google AI Studio](https://aistudio.google.com/app/apikey)에서 새 키를 발급받아 주세요.'
+      : '🔑 API 키가 인식되지 않습니다. 신규 키라면 활성화에 30초~1분 걸릴 수 있으니 잠시 후 다시 시도하거나, 키가 정확히 입력되었는지(앞뒤 공백·따옴표 없이 "AIza" 시작) 확인해 주세요. 그래도 안 되면 Google AI Studio에서 새 키를 발급받아 주세요.';
   }
   if (raw.includes('network') || raw.includes('fetch') || raw.includes('Failed') || raw.includes('ECONN')) {
     return md
